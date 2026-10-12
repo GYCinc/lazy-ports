@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Lazy Ports
+Comment=Manage local dev services and ports from the COSMIC panel
+Type=Application
+Icon=io.github.hayron.lazy-ports
+Exec=lazy-ports %F
+X-CosmicApplet=true
+Terminal=false
+StartupNotify=true
+Categories=COSMIC
+Keywords=COSMIC
+MimeType=

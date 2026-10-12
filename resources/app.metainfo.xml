@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.hayron.lazy-ports</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Lazy Ports</name>
+  <summary>Manage local dev services and ports from the COSMIC panel</summary>
+  <description>
+    <p>
+      Lazy Ports is a COSMIC panel applet for managing local development
+      services and listening ports. It scans local TCP ports, lets you pin
+      services with start commands, open ports in the browser, view live
+      logs, and stop or kill processes — all from the panel.
+    </p>
+    <p>
+      It follows the system COSMIC theme by default, with an optional
+      legacy industrial dark look available in Preferences.
+    </p>
+  </description>
+  <icon type="remote" width="64" height="64" scale="1">
+    https://github.com/hayron/lazy-ports/raw/main/resources/icons/hicolor/scalable/apps/io.github.hayron.lazy-ports-symbolic.svg
+  </icon>
+  <url type="vcs-browser">https://github.com/hayron/lazy-ports</url>
+  <launchable type="desktop-id">io.github.hayron.lazy-ports.desktop</launchable>
+  <provides>
+    <id>com.system76.CosmicPanelApplet</id>
+    <binaries>
+      <binary>lazy-ports</binary>
+    </binaries>
+  </provides>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+  </supports>
+  <categories>
+    <category>COSMIC</category>
+  </categories>
+  <keywords>
+    <keyword>COSMIC</keyword>
+  </keywords>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2026-10-07">
+      <description>
+        <p>System COSMIC theme by default with optional industrial look; multi-port group rows fixed.</p>
+      </description>
+    </release>
+  </releases>
+</component>

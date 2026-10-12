@@ -1,0 +1,4 @@
+- **2026-10-08 12:12** [clarification] Clarified multi-version confusion: lazy-ports = sole upload target, -legacy = backup of old code, -new = nonexistent wrong path; panel runs stale Oct 3 installed binary not the Oct 6 build
+- **2026-10-08 13:33** [clarification] Clarified install semantics: terminal dev-install (just install) is agent's job, app-store install is for end users after Flathub publish; gave user panel-verification checklist
+- **2026-10-12 15:25** [initialization] Hydrated context and ran session start checklist
+- **2026-10-12 16:09** [ui] Redesigned UI conforming to COSMIC applet template: list_column cards, removed jarring stop button styling, scrollable popup, clean section headers
