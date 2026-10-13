@@ -2,3 +2,4 @@
 - **2026-10-08 13:33** [clarification] Clarified install semantics: terminal dev-install (just install) is agent's job, app-store install is for end users after Flathub publish; gave user panel-verification checklist
 - **2026-10-12 15:25** [initialization] Hydrated context and ran session start checklist
 - **2026-10-12 16:09** [ui] Redesigned UI conforming to COSMIC applet template: list_column cards, removed jarring stop button styling, scrollable popup, clean section headers
+- **2026-10-12 21:04** [ui] Restored custom layout, app label, and theme adherence with proper padding

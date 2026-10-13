@@ -130,6 +130,7 @@ pub enum Message {
     ToggleShowPorts,
     ToggleShowInactive,
     ToggleSettings,
+    ToggleSearch,
     ToggleExpandService(String),
     ToggleReservePort(String),
     RestartService(String),
@@ -185,6 +186,7 @@ pub struct AppModel {
     in_reserved: bool,
     error: Option<String>,
     filter: String,
+    search_active: bool,
 }
 
 impl cosmic::Application for AppModel {
@@ -245,6 +247,7 @@ impl cosmic::Application for AppModel {
             in_reserved: false,
             error: services_corrupt.then(|| CORRUPT_CONFIG_MSG.to_string()),
             filter: String::new(),
+            search_active: false,
         };
 
         if !app.services_corrupt
@@ -314,7 +317,11 @@ impl cosmic::Application for AppModel {
                     .height(Length::Fixed(400.0)),
                 );
 
-            return self.core.applet.popup_container(content).into();
+            let padded = widget::container(content)
+                .padding([12, 14])
+                .width(Length::Fill);
+
+            return self.core.applet.popup_container(padded).into();
         }
 
         // 2. Settings
@@ -395,13 +402,17 @@ impl cosmic::Application for AppModel {
             let about = widget::Text::new("Lazy Ports v0.1.0").size(11.0);
 
             let content = widget::column::with_capacity(4)
-                .spacing(4.0)
+                .spacing(8.0)
                 .width(Length::Fill)
                 .push(header)
                 .push(pref)
                 .push(about);
 
-            return self.core.applet.popup_container(content).into();
+            let padded = widget::container(content)
+                .padding([12, 14])
+                .width(Length::Fill);
+
+            return self.core.applet.popup_container(padded).into();
         }
 
         // 3. Add / Edit form
@@ -485,23 +496,52 @@ impl cosmic::Application for AppModel {
                 .push(form)
                 .push(buttons);
 
-            return self.core.applet.popup_container(content).into();
+            let padded = widget::container(content)
+                .padding([12, 14])
+                .width(Length::Fill);
+
+            return self.core.applet.popup_container(padded).into();
         }
 
         // 4. Main view
-        let filter_field = text_input("Filter…", &self.filter)
-            .on_input(Message::FilterInput)
-            .width(Length::Fill);
+        let header = if self.search_active {
+            let filter_field = text_input("Filter services or ports…", &self.filter)
+                .on_input(Message::FilterInput)
+                .width(Length::Fill);
 
-        let header = widget::row::with_capacity(2)
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(8.0)
-            .width(Length::Fill)
-            .push(filter_field)
-            .push(
-                widget::button::icon(icon::from_name("emblem-system-symbolic").size(16))
-                    .on_press(Message::ToggleSettings),
-            );
+            widget::row::with_capacity(3)
+                .align_y(cosmic::iced::Alignment::Center)
+                .spacing(8.0)
+                .width(Length::Fill)
+                .push(filter_field)
+                .push(
+                    widget::button::icon(icon::from_name("edit-clear-symbolic").size(16))
+                        .on_press(Message::ToggleSearch),
+                )
+                .push(
+                    widget::button::icon(icon::from_name("emblem-system-symbolic").size(16))
+                        .on_press(Message::ToggleSettings),
+                )
+        } else {
+            widget::row::with_capacity(4)
+                .align_y(cosmic::iced::Alignment::Center)
+                .spacing(8.0)
+                .width(Length::Fill)
+                .push(
+                    widget::button::icon(icon::from_name("edit-find-symbolic").size(16))
+                        .on_press(Message::ToggleSearch),
+                )
+                .push(
+                    widget::Text::new(fl!("app-title"))
+                        .size(16.0)
+                        .font(cosmic::font::semibold())
+                        .width(Length::Fill),
+                )
+                .push(
+                    widget::button::icon(icon::from_name("emblem-system-symbolic").size(16))
+                        .on_press(Message::ToggleSettings),
+                )
+        };
 
         let mut scroll_content = widget::column::with_capacity(20).spacing(10.0).width(Length::Fill);
 
@@ -545,6 +585,7 @@ impl cosmic::Application for AppModel {
 
         if !inactive_services.is_empty() {
             scroll_content = scroll_content.push(self.section_rail(
+                LED_PURPLE,
                 &format!("{} ({})", fl!("inactive-services"), inactive_services.len()),
                 self.show_inactive,
                 Message::ToggleShowInactive,
@@ -582,6 +623,7 @@ impl cosmic::Application for AppModel {
         let unpinned_count = unpinned.len();
 
         scroll_content = scroll_content.push(self.section_rail(
+            LED_CYAN,
             &format!("{} ({})", fl!("discovered-ports"), unpinned_count),
             self.config.show_ports,
             Message::ToggleShowPorts,
@@ -632,7 +674,11 @@ impl cosmic::Application for AppModel {
             .push(widget::scrollable(scroll_content).height(Length::Fill))
             .push(footer);
 
-        self.core.applet.popup_container(main_layout).into()
+        let padded = widget::container(main_layout)
+            .padding([12, 14])
+            .width(Length::Fill);
+
+        self.core.applet.popup_container(padded).into()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
@@ -705,10 +751,10 @@ impl cosmic::Application for AppModel {
                         None,
                     );
                     popup_settings.positioner.size_limits = Limits::NONE
-                        .max_width(372.0)
-                        .min_width(300.0)
+                        .max_width(420.0)
+                        .min_width(320.0)
                         .min_height(200.0)
-                        .max_height(800.0);
+                        .max_height(960.0);
                     get_popup(popup_settings)
                 };
             }
@@ -785,6 +831,12 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleSettings => {
                 self.show_settings = !self.show_settings;
+            }
+            Message::ToggleSearch => {
+                self.search_active = !self.search_active;
+                if !self.search_active {
+                    self.filter.clear();
+                }
             }
             Message::ToggleShowPorts => {
                 self.config.show_ports = !self.config.show_ports;
@@ -946,7 +998,10 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::FilterInput(v) => self.filter = v,
-            Message::FilterTo(v) => self.filter = v,
+            Message::FilterTo(v) => {
+                self.filter = v;
+                self.search_active = true;
+            }
             Message::NameInput(v) => self.in_name = v,
             Message::AddressInput(v) => self.in_address = v,
             Message::CmdInput(v) => self.in_cmd = v,
@@ -1053,27 +1108,26 @@ impl cosmic::Application for AppModel {
 
 impl AppModel {
     fn empty_state<'a>(&'a self, msg: String) -> Element<'a, Message> {
-        widget::list_column()
-            .add(
-                widget::container(widget::Text::new(msg).size(13.0))
-                    .padding([14, 16])
-                    .width(Length::Fill)
-                    .center_x(Length::Fill),
-            )
+        widget::container(widget::Text::new(msg).size(13.0))
+            .padding([14, 16])
+            .width(Length::Fill)
+            .center_x(Length::Fill)
+            .class(cosmic::theme::Container::Card)
             .into()
     }
 
     fn section_rail(
         &self,
+        led: cosmic::iced::Color,
         title: &str,
         open: bool,
         toggle: Message,
     ) -> Element<'_, Message> {
-        let icon_name = if open { "go-up-symbolic" } else { "go-down-symbolic" };
-        widget::row::with_capacity(3)
+        widget::row::with_capacity(4)
             .align_y(cosmic::iced::Alignment::Center)
             .spacing(8.0)
             .width(Length::Fill)
+            .push(status_led(led))
             .push(
                 widget::Text::new(title.to_string())
                     .size(13.0)
@@ -1081,7 +1135,7 @@ impl AppModel {
                     .width(Length::Fill),
             )
             .push(
-                widget::button::icon(icon::from_name(icon_name).size(14))
+                widget::button::text(if open { fl!("hide") } else { fl!("show") })
                     .on_press(toggle),
             )
             .into()
@@ -1654,38 +1708,44 @@ impl AppModel {
             ));
         }
 
+        let mut title_left = widget::row::with_capacity(3)
+            .align_y(cosmic::iced::Alignment::Center)
+            .spacing(6.0)
+            .push(
+                widget::Text::new(display_name.clone())
+                    .size(13.0)
+                    .font(cosmic::font::semibold()),
+            );
+
+        if let Some(fw) = &framework {
+            title_left = title_left.push(
+                widget::button::text(format!("[{fw}]"))
+                    .class(cosmic::theme::Button::Text)
+                    .on_press(Message::FilterTo(process_name.clone())),
+            );
+        } else if process_name != display_name {
+            title_left = title_left.push(
+                widget::button::text(format!("[{process_name}]"))
+                    .class(cosmic::theme::Button::Text)
+                    .on_press(Message::FilterTo(process_name.clone())),
+            );
+        }
+
         let title_row = widget::row::with_capacity(3)
             .align_y(cosmic::iced::Alignment::Center)
             .spacing(8.0)
             .width(Length::Fill)
             .push(status_led(LED_CYAN))
-            .push(
-                widget::Text::new(display_name.clone())
-                    .size(13.0)
-                    .font(cosmic::font::semibold())
-                    .width(Length::Fill),
-            )
+            .push(title_left)
+            .push(widget::Space::new().width(Length::Fill))
             .push(actions);
 
-        let mut detail_row = widget::row::with_capacity(3)
+        let detail_row = widget::row::with_capacity(2)
             .align_y(cosmic::iced::Alignment::Center)
             .spacing(8.0)
             .width(Length::Fill)
-            .push(widget::Text::new(port_label).size(12.0).width(Length::Fill));
-
-        if let Some(fw) = &framework {
-            detail_row = detail_row.push(
-                widget::button::text(fw.clone())
-                    .on_press(Message::FilterTo(process_name.clone())),
-            );
-        } else if process_name != display_name {
-            detail_row = detail_row.push(
-                widget::button::text(process_name.clone())
-                    .on_press(Message::FilterTo(process_name.clone())),
-            );
-        }
-
-        detail_row = detail_row.push(widget::Text::new(pid_spec).size(11.0));
+            .push(widget::Text::new(port_label).size(12.0).width(Length::Fill))
+            .push(widget::Text::new(pid_spec).size(11.0));
 
         let mut content = widget::column::with_capacity(3)
             .spacing(4.0)
