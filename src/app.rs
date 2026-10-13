@@ -7,8 +7,10 @@ use crate::services::{self, Health};
 #[path = "cbar.rs"]
 mod cbar;
 use cosmic::cosmic_config::{ConfigSet, CosmicConfigEntry};
+use cosmic::iced::core::text::Span;
+use cosmic::iced::futures;
 use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
-use cosmic::iced::{futures, Length, Limits, Subscription, window::Id};
+use cosmic::iced::{Length, Limits, Subscription, window::Id};
 use cosmic::prelude::*;
 use cosmic::widget::{self, icon, settings, text_input};
 use futures::{SinkExt, StreamExt};
@@ -19,13 +21,165 @@ const APP_ID: &str = "io.github.hayron.lazy-ports";
 
 const CORRUPT_CONFIG_MSG: &str = "Service config is corrupt — services are read-only until reset.";
 
-const LED_AMBER: cosmic::iced::Color = cosmic::iced::Color { r: 0.961, g: 0.702, b: 0.263, a: 1.0 };
-const LED_CYAN: cosmic::iced::Color = cosmic::iced::Color { r: 0.541, g: 0.812, b: 0.839, a: 1.0 };
-const LED_PURPLE: cosmic::iced::Color = cosmic::iced::Color { r: 0.718, g: 0.541, b: 0.839, a: 1.0 };
-const LED_GREEN: cosmic::iced::Color = cosmic::iced::Color { r: 0.663, g: 0.839, b: 0.541, a: 1.0 };
-
 fn action(m: Message) -> cosmic::Action<Message> {
     cosmic::Action::from(m)
+}
+
+// --- Tetradic Pastel Chassis Palette (#8ACFD6, #B78AD6, #D6918A, #A9D68A) ---
+const LED_AMBER: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.961,
+    g: 0.702,
+    b: 0.263,
+    a: 1.0,
+}; // #f5b343 starting
+const LED_RED: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.839,
+    g: 0.569,
+    b: 0.541,
+    a: 1.0,
+}; // #D6918A Soft Coral / Failed / Stop
+const LED_CYAN: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.541,
+    g: 0.812,
+    b: 0.839,
+    a: 1.0,
+}; // #8ACFD6 Soft Cyan / Listening / Browser
+const LED_PURPLE: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.718,
+    g: 0.541,
+    b: 0.839,
+    a: 1.0,
+}; // #B78AD6 Soft Lavender / Inactive
+const LED_GREEN: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.663,
+    g: 0.839,
+    b: 0.541,
+    a: 1.0,
+}; // #A9D68A Soft Sage Green / Active / Start
+const COLOR_CHASSIS: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.078,
+    g: 0.086,
+    b: 0.106,
+    a: 1.0,
+}; // #14161b main chassis fill
+const COLOR_SURFACE: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.106,
+    g: 0.122,
+    b: 0.145,
+    a: 1.0,
+}; // #1b1f25 row-card plate: one clean step up from the chassis
+const COLOR_VIEWPORT: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.047,
+    g: 0.055,
+    b: 0.071,
+    a: 1.0,
+}; // #0c0e12 drawer / pressed
+const COLOR_PANEL: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.067,
+    g: 0.075,
+    b: 0.090,
+    a: 1.0,
+}; // #111317 header plate
+const COLOR_FOOTER: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.063,
+    g: 0.071,
+    b: 0.090,
+    a: 1.0,
+}; // #101217 footer plate
+const COLOR_BORDER: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.145,
+    g: 0.161,
+    b: 0.196,
+    a: 1.0,
+}; // #252932
+const COLOR_BORDER_LIGHT: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.196,
+    g: 0.216,
+    b: 0.259,
+    a: 1.0,
+}; // #323742
+const COLOR_DANGER: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.184,
+    g: 0.078,
+    b: 0.125,
+    a: 1.0,
+}; // ~#2f1420 rose-950/60 plate
+const COLOR_SUBTLE: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.384,
+    g: 0.408,
+    b: 0.459,
+    a: 1.0,
+}; // #626875 separators/labels
+const COLOR_DIM: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.545,
+    g: 0.576,
+    b: 0.627,
+    a: 1.0,
+}; // #8b93a0 secondary telemetry
+const COLOR_BRIGHT: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.902,
+    g: 0.929,
+    b: 0.953,
+    a: 1.0,
+}; // #e6edf3 titles
+const COLOR_KEY: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.831,
+    g: 0.831,
+    b: 0.847,
+    a: 1.0,
+}; // #d4d4d8 icons/badge text
+
+const COLOR_TEXT2: cosmic::iced::Color = cosmic::iced::Color {
+    r: 0.667,
+    g: 0.706,
+    b: 0.753,
+    a: 1.0,
+}; // #aab4c0 secondary telemetry — the one readable mid-tone
+
+/// A user-selectable accent. The industrial dark chassis is fixed; only the
+/// accent moves — the hero port, the running LED, its bloom and the start key.
+#[derive(Clone, Copy, PartialEq)]
+pub struct Accent {
+    pub label: &'static str,
+    pub color: cosmic::iced::Color,
+}
+
+const ACCENT_EMERALD: Accent = Accent {
+    label: "Sage",
+    color: LED_GREEN,
+};
+const ACCENT_AMBER: Accent = Accent {
+    label: "Amber",
+    color: LED_AMBER,
+};
+const ACCENT_CYAN: Accent = Accent {
+    label: "Cyan",
+    color: LED_CYAN,
+};
+const ACCENT_ROSE: Accent = Accent {
+    label: "Coral",
+    color: LED_RED,
+};
+const ACCENT_VIOLET: Accent = Accent {
+    label: "Lavender",
+    color: LED_PURPLE,
+};
+
+pub const ACCENTS: [Accent; 5] = [
+    ACCENT_EMERALD,
+    ACCENT_AMBER,
+    ACCENT_CYAN,
+    ACCENT_ROSE,
+    ACCENT_VIOLET,
+];
+
+/// Resolve a persisted accent name, falling back to emerald for anything unknown.
+fn accent_from_name(name: &str) -> Accent {
+    ACCENTS
+        .iter()
+        .copied()
+        .find(|a| a.label.eq_ignore_ascii_case(name.trim()))
+        .unwrap_or(ACCENT_EMERALD)
 }
 
 fn status_led<'a, M: 'static>(color: cosmic::iced::Color) -> Element<'a, M> {
@@ -49,13 +203,302 @@ fn status_led<'a, M: 'static>(color: cosmic::iced::Color) -> Element<'a, M> {
     .into()
 }
 
+/// Bold monospace font for the hero port value.
+fn mono_bold() -> cosmic::iced::Font {
+    cosmic::iced::Font {
+        weight: cosmic::iced::font::Weight::Bold,
+        ..cosmic::font::mono()
+    }
+}
+
+/// Clickable row title: 13.0 px semibold text that opens the URL on press.
+/// Highlights in soft cyan on hover.
+fn link_title<'a>(title: String, url: String) -> Element<'a, Message> {
+    let txt = widget::Text::new(title)
+        .size(13.0)
+        .font(cosmic::font::semibold())
+        .wrapping(cosmic::iced::core::text::Wrapping::None);
+
+    let btn = widget::button::custom(txt)
+        .padding(0)
+        .class(cosmic::theme::Button::Custom {
+            active: Box::new(|_, _| key_style_flat(COLOR_BRIGHT)),
+            disabled: Box::new(|_| key_style_flat(COLOR_DIM)),
+            hovered: Box::new(|_, _| key_style_flat(LED_CYAN)),
+            pressed: Box::new(|_, _| key_style_flat(COLOR_BRIGHT)),
+        })
+        .on_press(Message::Open(url.clone()));
+
+    tip(btn, format!("Open {url}"))
+}
+
+/// Plain row title: 13.0 px semibold text matching link_title typography.
+fn plain_title<'a>(title: String, industrial: bool) -> Element<'a, Message> {
+    let txt = widget::Text::new(title)
+        .size(13.0)
+        .font(cosmic::font::semibold())
+        .wrapping(cosmic::iced::core::text::Wrapping::None);
+    if industrial {
+        txt.class(cosmic::theme::Text::Color(COLOR_BRIGHT)).into()
+    } else {
+        txt.into()
+    }
+}
+
+/// Secondary telemetry: 12 px monospace, readable mid-tone.
+fn dim_mono<'a, M: 'static>(s: impl Into<String> + 'a) -> Element<'a, M> {
+    widget::Text::new(s.into())
+        .size(12.0)
+        .font(cosmic::font::mono())
+        .wrapping(cosmic::iced::core::text::Wrapping::None)
+        .class(cosmic::theme::Text::Color(COLOR_TEXT2))
+        .into()
+}
+
+/// Faint label or separator: 11 px monospace, chassis subtle.
+fn faint_mono<'a, M: 'static>(s: impl Into<String> + 'a) -> Element<'a, M> {
+    widget::Text::new(s.into())
+        .size(11.0)
+        .font(cosmic::font::mono())
+        .wrapping(cosmic::iced::core::text::Wrapping::None)
+        .class(cosmic::theme::Text::Color(COLOR_SUBTLE))
+        .into()
+}
+
+/// Endpoint line: `localhost:3000` on the left, `PID 93579` / telemetry on the far right.
+fn endpoint_line<'a, M: 'static>(
+    host: &'a str,
+    port: String,
+    spec: String,
+    port_color: cosmic::iced::Color,
+) -> Element<'a, M> {
+    let clean_host = host.trim_end_matches(':').trim();
+    let host_prefix = if clean_host.is_empty() {
+        String::new()
+    } else {
+        format!("{clean_host}:")
+    };
+    let dim: Span<'_, ()> = Span::new(host_prefix)
+        .size(12.0)
+        .font(cosmic::font::mono())
+        .color(COLOR_TEXT2);
+    let hero: Span<'_, ()> = Span::new(port)
+        .size(14.0)
+        .font(mono_bold())
+        .color(port_color);
+
+    let left = cosmic::iced::widget::text::Rich::with_spans([dim, hero])
+        .wrapping(cosmic::iced::core::text::Wrapping::None);
+
+    if spec.is_empty() {
+        left.into()
+    } else {
+        let right = widget::Text::new(spec)
+            .size(12.0)
+            .font(cosmic::font::mono())
+            .wrapping(cosmic::iced::core::text::Wrapping::None)
+            .class(cosmic::theme::Text::Color(COLOR_TEXT2));
+
+        widget::row::with_capacity(3)
+            .width(Length::Fill)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(left)
+            .push(widget::Space::new().width(Length::Fill))
+            .push(right)
+            .into()
+    }
+}
+
+
+/// Same chip, but clicking it filters the whole list to that process.
+fn filter_badge<'a>(process: String, text: String) -> Element<'a, Message> {
+    let chip = badge_plate_widget(text);
+    tip(
+        widget::button::custom(chip)
+            .padding(0)
+            .class(badge_button_class())
+            .on_press(Message::FilterTo(process.clone())),
+        format!("Filter by {process}"),
+    )
+}
+
+/// Crisp uppercase tag: subtle surface background, 1px border, high-contrast readable text.
+fn badge_plate_widget<'a, M: 'static>(s: String) -> Element<'a, M> {
+    let txt = widget::Text::new(s.to_uppercase())
+        .size(11.0)
+        .font(cosmic::font::semibold())
+        .wrapping(cosmic::iced::core::text::Wrapping::None)
+        .class(cosmic::theme::Text::Color(COLOR_KEY));
+
+    widget::container(txt)
+        .padding([2, 6])
+        .class(cosmic::theme::Container::Custom(Box::new(|_| {
+            cosmic::iced::widget::container::Style {
+                background: Some(cosmic::iced::Background::Color(COLOR_VIEWPORT)),
+                border: cosmic::iced::Border {
+                    radius: 4.0.into(),
+                    width: 1.0,
+                    color: COLOR_BORDER,
+                },
+                ..Default::default()
+            }
+        })))
+        .into()
+}
+
+/// Badge button: highlights on hover.
+fn badge_button_class() -> cosmic::theme::Button {
+    cosmic::theme::Button::Custom {
+        active: Box::new(|_, _| cosmic::widget::button::Style::new()),
+        disabled: Box::new(|_| cosmic::widget::button::Style::new()),
+        hovered: Box::new(|_, _| {
+            let mut style = cosmic::widget::button::Style::new();
+            style.icon_color = Some(COLOR_BRIGHT);
+            style.text_color = Some(COLOR_BRIGHT);
+            style
+        }),
+        pressed: Box::new(|_, _| cosmic::widget::button::Style::new()),
+    }
+}
+
+/// Pin button anchored in the upper-right corner of a card.
+fn pin_circle_button<'a>(msg: Message, pinned: bool, accent: Accent) -> Element<'a, Message> {
+    let glyph = widget::container(icon::from_name("view-pin-symbolic").size(14))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .align_x(cosmic::iced::Alignment::Center)
+        .align_y(cosmic::iced::Alignment::Center);
+    tip(
+        widget::button::custom(glyph)
+            .width(Length::Fixed(24.0))
+            .height(Length::Fixed(24.0))
+            .padding(0)
+            .class(pin_button_class(pinned, accent))
+            .on_press(msg),
+        if pinned {
+            "Pinned service · click to edit"
+        } else {
+            "Pin as Lazy Ports service"
+        },
+    )
+}
+
+fn pin_button_class(pinned: bool, accent: Accent) -> cosmic::theme::Button {
+    let base_ink = if pinned { accent.color } else { COLOR_TEXT2 };
+    cosmic::theme::Button::Custom {
+        active: Box::new(move |_, _| cosmic::widget::button::Style {
+            background: None,
+            border_width: 0.0,
+            border_color: cosmic::iced::Color::TRANSPARENT,
+            border_radius: 4.0.into(),
+            icon_color: Some(base_ink),
+            text_color: Some(base_ink),
+            ..Default::default()
+        }),
+        disabled: Box::new(|_| key_style_flat(COLOR_DIM)),
+        hovered: Box::new(move |_, _| cosmic::widget::button::Style {
+            background: Some(cosmic::iced::Background::Color(COLOR_BORDER)),
+            border_width: 1.0,
+            border_color: COLOR_BORDER_LIGHT,
+            border_radius: 4.0.into(),
+            icon_color: Some(if pinned { accent.color } else { COLOR_BRIGHT }),
+            text_color: Some(if pinned { accent.color } else { COLOR_BRIGHT }),
+            ..Default::default()
+        }),
+        pressed: Box::new(move |_, _| cosmic::widget::button::Style {
+            background: Some(cosmic::iced::Background::Color(COLOR_VIEWPORT)),
+            border_width: 1.0,
+            border_color: COLOR_BORDER,
+            border_radius: 4.0.into(),
+            icon_color: Some(base_ink),
+            text_color: Some(base_ink),
+            ..Default::default()
+        }),
+    }
+}
+
+/// Inset telemetry drawer: viewport plate, 1 px border, 4 px radius.
+fn drawer_plate() -> cosmic::theme::Container<'static> {
+    cosmic::theme::Container::custom(|_| cosmic::iced::widget::container::Style {
+        background: Some(cosmic::iced::Background::Color(COLOR_VIEWPORT)),
+        border: cosmic::iced::Border {
+            radius: 4.0.into(),
+            width: 1.0,
+            color: COLOR_BORDER,
+        },
+        ..Default::default()
+    })
+}
+
+/// One milled-key style state.
+fn key_style(
+    plate: cosmic::iced::Color,
+    border: cosmic::iced::Color,
+    ink: cosmic::iced::Color,
+) -> cosmic::widget::button::Style {
+    let mut style = cosmic::widget::button::Style::new();
+    style.background = Some(cosmic::iced::Background::Color(plate));
+    style.border_width = 1.0;
+    style.border_color = border;
+    style.border_radius = 4.0.into();
+    style.icon_color = Some(ink);
+    style.text_color = Some(ink);
+    style
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyColor {
+    Neutral,
+    Blue,
+    Green,
+    Danger,
+}
+
+/// Milled key button class: flat glyph at rest, plate on hover.
+/// Neutral / light blue (browser) / emerald (start) / rose (kill).
+fn key_button_class(color: KeyColor, accent: Accent) -> cosmic::theme::Button {
+    let base_ink = match color {
+        KeyColor::Green => accent.color,
+        KeyColor::Danger => LED_RED,
+        KeyColor::Blue => LED_CYAN,
+        KeyColor::Neutral => COLOR_TEXT2,
+    };
+    let (hover_plate, hover_border, hover_ink) = match color {
+        KeyColor::Danger => (COLOR_DANGER, LED_RED, LED_RED),
+        KeyColor::Blue => (COLOR_BORDER, LED_CYAN, LED_CYAN),
+        KeyColor::Green => (COLOR_BORDER, accent.color, accent.color),
+        KeyColor::Neutral => (COLOR_BORDER, COLOR_BORDER_LIGHT, COLOR_BRIGHT),
+    };
+    cosmic::theme::Button::Custom {
+        active: Box::new(move |_, _| key_style_flat(base_ink)),
+        disabled: Box::new(|_| key_style_flat(COLOR_DIM)),
+        hovered: Box::new(move |_, _| key_style(hover_plate, hover_border, hover_ink)),
+        pressed: Box::new(move |_, _| key_style(COLOR_VIEWPORT, COLOR_BORDER_LIGHT, hover_ink)),
+    }
+}
+
+/// Flat button state: ink only, no plate, no border.
+fn key_style_flat(ink: cosmic::iced::Color) -> cosmic::widget::button::Style {
+    let mut style = cosmic::widget::button::Style::new();
+    style.icon_color = Some(ink);
+    style.text_color = Some(ink);
+    style
+}
+
+/// Hover tooltip chip. Glyph-only keys and any value that can outgrow the
+/// 476 px chassis are wrapped in one of these, so a truncated service name or
+/// a 14 px glyph is still legible on hover.
 fn tip<'a, M: 'static>(
     content: impl Into<Element<'a, M>>,
     label: impl Into<String> + 'a,
 ) -> Element<'a, M> {
     widget::tooltip(
         content,
-        widget::Text::new(label.into()).size(11.0),
+        widget::Text::new(label.into())
+            .size(11.0)
+            .font(cosmic::font::mono())
+            .class(cosmic::theme::Text::Color(COLOR_BRIGHT)),
         widget::tooltip::Position::Bottom,
     )
     .gap(6)
@@ -63,37 +506,436 @@ fn tip<'a, M: 'static>(
     .into()
 }
 
-fn opt_str(v: &str) -> Option<String> {
-    let t = v.trim();
-    if t.is_empty() {
-        None
+/// 28 px square milled key with a 14 px glyph, optically centered.
+/// `label` is the hover tooltip — glyph-only controls must never ship without one.
+fn key_button<'a>(
+    name: &str,
+    label: &'a str,
+    accent: Accent,
+    msg: Message,
+    color: KeyColor,
+) -> Element<'a, Message> {
+    let base_ink = match color {
+        KeyColor::Green => accent.color,
+        KeyColor::Danger => LED_RED,
+        KeyColor::Blue => LED_CYAN,
+        KeyColor::Neutral => COLOR_TEXT2,
+    };
+    let glyph = widget::container(icon::from_name(name).size(14))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .align_x(cosmic::iced::Alignment::Center)
+        .align_y(cosmic::iced::Alignment::Center)
+        .class(cosmic::theme::Container::Custom(Box::new(move |_| {
+            cosmic::iced::widget::container::Style {
+                icon_color: Some(base_ink),
+                ..Default::default()
+            }
+        })));
+    tip(
+        widget::button::custom(glyph)
+            .width(Length::Fixed(28.0))
+            .height(Length::Fixed(28.0))
+            .padding(0)
+            .class(key_button_class(color, accent))
+            .on_press(msg),
+        label.to_string(),
+    )
+}
+
+/// Flat icon key: no plate, no border in any state — a glyph affordance, not
+/// button chrome.
+fn flat_key_button<'a>(name: &str, label: &'a str, msg: Message) -> Element<'a, Message> {
+    let glyph = widget::container(icon::from_name(name).size(14))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .align_x(cosmic::iced::Alignment::Center)
+        .align_y(cosmic::iced::Alignment::Center);
+    tip(
+        widget::button::custom(glyph)
+            .width(Length::Fixed(28.0))
+            .height(Length::Fixed(28.0))
+            .padding(0)
+            .class(cosmic::theme::Button::Custom {
+                active: Box::new(|_, _| flat_btn_style(COLOR_TEXT2)),
+                disabled: Box::new(|_| flat_btn_style(COLOR_SUBTLE)),
+                hovered: Box::new(|_, _| flat_btn_style(COLOR_BRIGHT)),
+                pressed: Box::new(|_, _| flat_btn_style(COLOR_TEXT2)),
+            })
+            .on_press(msg),
+        label.to_string(),
+    )
+}
+
+/// Bare button style: transparent plate and border, ink only.
+fn flat_btn_style(ink: cosmic::iced::Color) -> cosmic::widget::button::Style {
+    let mut style = cosmic::widget::button::Style::new();
+    style.icon_color = Some(ink);
+    style
+}
+
+/// A standalone named icon tinted to `color` (icons take their color from the
+/// enclosing container style, not from the icon itself).
+fn tinted_icon<'a>(name: &str, size: u16, color: cosmic::iced::Color) -> Element<'a, Message> {
+    widget::container(icon::from_name(name).size(size))
+        .class(cosmic::theme::Container::Custom(Box::new(move |_| {
+            cosmic::iced::widget::container::Style {
+                icon_color: Some(color),
+                ..Default::default()
+            }
+        })))
+        .into()
+}
+
+/// Compact mono utility button for the footer.
+fn key_text_button<'a>(label: impl Into<String> + 'a, msg: Message) -> Element<'a, Message> {
+    key_glyph_text_button(None, label, msg)
+}
+
+/// Footer utility button with a leading glyph, e.g. Rescan.
+fn key_glyph_text_button<'a>(
+    glyph: Option<&'a str>,
+    label: impl Into<String> + 'a,
+    msg: Message,
+) -> Element<'a, Message> {
+    let text = widget::Text::new(label.into())
+        .size(13.0)
+        .font(mono_bold())
+        .wrapping(cosmic::iced::core::text::Wrapping::None)
+        .class(cosmic::theme::Text::Color(COLOR_KEY));
+
+    let content: Element<'a, Message> = match glyph {
+        Some(name) => widget::row::with_capacity(2)
+            .align_y(cosmic::iced::Alignment::Center)
+            .spacing(6.0)
+            .push(tinted_icon(name, 14, COLOR_KEY))
+            .push(text)
+            .into(),
+        None => text.into(),
+    };
+
+    widget::button::custom(content)
+        .padding([4, 10])
+        .class(key_button_class(KeyColor::Neutral, ACCENT_EMERALD))
+        .on_press(msg)
+        .into()
+}
+
+/// Phosphor LED: 8 px circular bullet with a soft bloom.
+fn led_glow<'a, M: 'static>(color: cosmic::iced::Color) -> Element<'a, M> {
+    widget::container(
+        widget::Space::new()
+            .width(Length::Fixed(8.0))
+            .height(Length::Fixed(8.0)),
+    )
+    .width(Length::Fixed(8.0))
+    .height(Length::Fixed(8.0))
+    .class(cosmic::theme::Container::Custom(Box::new(move |_| {
+        cosmic::iced::widget::container::Style {
+            background: Some(cosmic::iced::Background::Color(color)),
+            border: cosmic::iced::Border {
+                radius: 4.0.into(),
+                ..Default::default()
+            },
+            shadow: cosmic::iced::Shadow {
+                color,
+                offset: cosmic::iced::Vector::ZERO,
+                blur_radius: 4.0,
+            },
+            ..Default::default()
+        }
+    })))
+    .into()
+}
+
+/// Settings key for a refresh mode; the active mode lights up in the accent.
+fn refresh_rate_key<'a>(
+    secs: u64,
+    label: String,
+    current: u64,
+    accent: Accent,
+) -> Element<'a, Message> {
+    let color = if current == secs {
+        KeyColor::Green
     } else {
-        Some(t.to_string())
+        KeyColor::Neutral
+    };
+    tip(
+        widget::button::custom(
+            widget::Text::new(label)
+                .size(12.0)
+                .font(cosmic::font::mono()),
+        )
+        .padding([4, 10])
+        .class(key_button_class(color, accent))
+        .on_press(Message::SetRefresh(secs)),
+        format!("{secs}s interval"),
+    )
+}
+
+/// Ringed magnifier: the search hold-in spot. A 1 px hairline ring on a
+/// transparent fill — the only search chrome there is.
+fn search_ring() -> cosmic::theme::Container<'static> {
+    cosmic::theme::Container::custom(|_| cosmic::iced::widget::container::Style {
+        border: cosmic::iced::Border {
+            radius: 13.0.into(),
+            width: 1.0,
+            color: COLOR_BORDER_LIGHT,
+        },
+        ..Default::default()
+    })
+}
+
+/// Borderless filter field: transparent in every state, no placeholder text.
+/// It sits beside the magnifier ring, which carries the affordance.
+fn filter_input_class() -> cosmic::theme::TextInput {
+    fn clear() -> cosmic::widget::text_input::Appearance {
+        cosmic::widget::text_input::Appearance {
+            background: cosmic::iced::Background::Color(cosmic::iced::Color::TRANSPARENT),
+            border_radius: 0.0.into(),
+            border_offset: None,
+            border_width: 0.0,
+            border_color: cosmic::iced::Color::TRANSPARENT,
+            label_color: COLOR_TEXT2,
+            placeholder_color: cosmic::iced::Color::TRANSPARENT,
+            selected_text_color: COLOR_BRIGHT,
+            icon_color: Some(COLOR_TEXT2),
+            text_color: Some(COLOR_BRIGHT),
+            selected_fill: COLOR_BORDER,
+        }
+    }
+    cosmic::theme::TextInput::Custom {
+        active: Box::new(|_| clear()),
+        error: Box::new(|_| clear()),
+        hovered: Box::new(|_| clear()),
+        focused: Box::new(|_| clear()),
+        disabled: Box::new(|_| clear()),
     }
 }
 
-fn parse_services(json: &str) -> Result<Vec<ServiceConfig>, serde_json::Error> {
-    if json.trim().is_empty() {
-        Ok(Vec::new())
+/// Row card: one elevation step over the chassis with a single hairline.
+/// Hover brightens the hairline only — no fill jump, no second gray.
+fn row_card(hovered: bool) -> cosmic::theme::Container<'static> {
+    let border = if hovered {
+        COLOR_BORDER_LIGHT
     } else {
-        serde_json::from_str(json)
+        COLOR_BORDER
+    };
+    cosmic::theme::Container::custom(move |_| cosmic::iced::widget::container::Style {
+        background: Some(cosmic::iced::Background::Color(COLOR_SURFACE)),
+        border: cosmic::iced::Border {
+            radius: 6.0.into(),
+            width: 1.0,
+            color: border,
+        },
+        ..Default::default()
+    })
+}
+
+/// Theme-aware row plate: legacy dark hairline card in industrial mode,
+/// theme `Card` in system mode (follows COSMIC light/dark + accent).
+fn card_class(hovered: bool, industrial: bool) -> cosmic::theme::Container<'static> {
+    if industrial {
+        row_card(hovered)
+    } else {
+        cosmic::theme::Container::Card
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Theme-aware drawer plate: viewport inset in industrial, `Secondary` on system.
+fn drawer_class(industrial: bool) -> cosmic::theme::Container<'static> {
+    if industrial {
+        drawer_plate()
+    } else {
+        cosmic::theme::Container::Secondary
+    }
+}
 
-    #[test]
-    fn empty_services_json_is_valid() {
-        assert!(parse_services("").unwrap().is_empty());
-        assert!(parse_services("  \n ").unwrap().is_empty());
+/// Theme-aware badge: dark viewport chip in industrial, `Secondary` chip on system.
+fn themed_badge<'a, M: 'static>(s: String, industrial: bool) -> Element<'a, M> {
+    if industrial {
+        return badge_plate_widget(s);
+    }
+    let txt = widget::Text::new(s.to_uppercase())
+        .size(11.0)
+        .font(cosmic::font::semibold())
+        .wrapping(cosmic::iced::core::text::Wrapping::None);
+    widget::container(txt)
+        .padding([2, 6])
+        .class(cosmic::theme::Container::Secondary)
+        .into()
+}
+
+/// Theme-aware endpoint line: legacy hero-port Rich line in industrial;
+/// plain theme text with fill-separated spec on system (no hardcoded colors,
+/// so light themes stay legible and nothing can overlay the actions row).
+fn themed_endpoint<'a, M: 'static>(
+    port_label: String,
+    spec: String,
+    port_color: cosmic::iced::Color,
+    industrial: bool,
+) -> Element<'a, M> {
+    if industrial {
+        return endpoint_line("localhost", port_label, spec, port_color);
+    }
+    if spec.is_empty() {
+        return widget::Text::new(port_label)
+            .size(13.0)
+            .font(cosmic::font::mono())
+            .wrapping(cosmic::iced::core::text::Wrapping::None)
+            .into();
+    }
+    widget::row::with_capacity(3)
+        .width(Length::Fill)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(
+            widget::Text::new(port_label)
+                .size(13.0)
+                .font(mono_bold())
+                .wrapping(cosmic::iced::core::text::Wrapping::None),
+        )
+        .push(widget::Space::new().width(Length::Fill))
+        .push(
+            widget::Text::new(spec)
+                .size(12.0)
+                .font(cosmic::font::mono())
+                .wrapping(cosmic::iced::core::text::Wrapping::None),
+        )
+        .into()
+}
+
+/// One card shape for every row type: a title row (LED + clipped name + tag +
+/// pin button + action keys) over an endpoint line that owns the full second row.
+#[allow(clippy::too_many_arguments)]
+fn card_shell<'a>(
+    led: cosmic::iced::Color,
+    title: Element<'a, Message>,
+    badge: Element<'a, Message>,
+    pin_btn: Option<Element<'a, Message>>,
+    endpoint: Element<'a, Message>,
+    actions: Element<'a, Message>,
+    drawer: Option<Element<'a, Message>>,
+    hovered: bool,
+    hover_id: String,
+    industrial: bool,
+) -> Element<'a, Message> {
+    let spacing = cosmic::theme::spacing();
+    let title_left = widget::row::with_capacity(3)
+        .align_y(cosmic::iced::Alignment::Center)
+        .spacing(spacing.space_xs)
+        .push(led_glow(led))
+        .push(title)
+        .push(badge);
+
+    let mut actions_right = widget::row::with_capacity(3)
+        .align_y(cosmic::iced::Alignment::Center)
+        .spacing(6.0)
+        .push(actions);
+    if let Some(pin) = pin_btn {
+        actions_right = actions_right.push(pin);
     }
 
-    #[test]
-    fn corrupt_services_json_is_err() {
-        assert!(parse_services("{not json").is_err());
+    let title_row = widget::row::with_capacity(2)
+        .align_y(cosmic::iced::Alignment::Center)
+        .width(Length::Fill)
+        .push(
+            widget::container(title_left)
+                .width(Length::Fill)
+                .clip(true),
+        )
+        .push(actions_right);
+
+    let mut card_col = widget::column::with_capacity(3)
+        .spacing(4.0)
+        .push(title_row)
+        .push(endpoint);
+    if let Some(d) = drawer {
+        card_col = card_col.push(d);
     }
+
+    let plate = widget::container(card_col)
+        .padding([8, 10])
+        .width(Length::Fill)
+        .class(card_class(hovered, industrial));
+
+    widget::mouse_area(plate)
+        .on_enter(Message::HoverRow(Some(hover_id)))
+        .on_exit(Message::HoverRow(None))
+        .into()
+}
+
+/// Outer chassis: the `#14161b` instrument body with its hairline edge and
+/// soft drop shadow. Without this every plate below paints onto transparency,
+/// which is what made the popup read as a floating tab.
+fn chassis_plate() -> cosmic::theme::Container<'static> {
+    cosmic::theme::Container::custom(|_| cosmic::iced::widget::container::Style {
+        background: Some(cosmic::iced::Background::Color(COLOR_CHASSIS)),
+        border: cosmic::iced::Border {
+            radius: 12.0.into(),
+            width: 1.0,
+            color: COLOR_BORDER,
+        },
+        text_color: Some(COLOR_BRIGHT),
+        ..Default::default()
+    })
+}
+
+/// Flat structural plate for header / footer bands.
+fn panel_plate(fill: cosmic::iced::Color, radius: f32) -> cosmic::theme::Container<'static> {
+    cosmic::theme::Container::custom(move |_| cosmic::iced::widget::container::Style {
+        background: Some(cosmic::iced::Background::Color(fill)),
+        border: cosmic::iced::Border {
+            radius: radius.into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    })
+}
+
+/// A 1 px hairline rule, so adjacent bands read as separated instrument bays
+/// instead of one smeared block.
+fn seam() -> Element<'static, Message> {
+    widget::container(widget::Space::new())
+        .width(Length::Fill)
+        .height(Length::Fixed(1.0))
+        .class(panel_plate(COLOR_BORDER, 0.0))
+        .into()
+}
+
+/// Square logo / badge tile with a hairline border.
+/// Port of LocalPorts: a panel applet managing local dev services & ports.
+pub struct AppModel {
+    core: cosmic::Core,
+    popup: Option<Id>,
+    /// Popup id scheduled for a deferred destroy, still alive in the compositor.
+    popup_closing: Option<Id>,
+    config: Config,
+    config_ctx: Option<cosmic::cosmic_config::Config>,
+    services: Vec<ServiceConfig>,
+    services_corrupt: bool,
+    ports: Vec<ports::ListeningPort>,
+    states: HashMap<String, SvcState>,
+    health: HashMap<String, Health>,
+    stopping: HashSet<String>,
+    logs_open: Option<String>,
+    log_text: String,
+    show_add: bool,
+    show_settings: bool,
+    expanded_service: Option<String>,
+    show_inactive: bool,
+    /// Combine ports rows by owning process.
+    group_ports: bool,
+    edit_id: Option<String>,
+    in_name: String,
+    in_address: String,
+    in_cmd: String,
+    in_dir: String,
+    in_reserved: bool,
+    error: Option<String>,
+    /// Header filter: matches service names and ports ("filter name or port...").
+    filter: String,
+    /// Row currently under the cursor (spec tactile lift on hover).
+    hover: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -130,7 +972,6 @@ pub enum Message {
     ToggleShowPorts,
     ToggleShowInactive,
     ToggleSettings,
-    ToggleSearch,
     ToggleExpandService(String),
     ToggleReservePort(String),
     RestartService(String),
@@ -150,43 +991,21 @@ pub enum Message {
     EditService(String),
     ShowLogs(String),
     HideLogs,
-    LogText { id: String, text: String },
+    LogText {
+        id: String,
+        text: String,
+    },
     UpdateConfig(Config),
     QuitApplet,
     FilterInput(String),
+    /// Jump the filter to a process name (badge chip click).
     FilterTo(String),
+    /// Choose an explicit poll rate (settings view).
     SetRefresh(u64),
+    /// Pick a theme mode: "system" (COSMIC default) or "industrial".
+    SetThemeMode(String),
+    HoverRow(Option<String>),
     Event(services::Event),
-}
-
-pub struct AppModel {
-    core: cosmic::Core,
-    popup: Option<Id>,
-    popup_closing: Option<Id>,
-    config: Config,
-    config_ctx: Option<cosmic::cosmic_config::Config>,
-    services: Vec<ServiceConfig>,
-    services_corrupt: bool,
-    ports: Vec<ports::ListeningPort>,
-    states: HashMap<String, SvcState>,
-    health: HashMap<String, Health>,
-    stopping: HashSet<String>,
-    logs_open: Option<String>,
-    log_text: String,
-    show_add: bool,
-    show_settings: bool,
-    expanded_service: Option<String>,
-    show_inactive: bool,
-    group_ports: bool,
-    edit_id: Option<String>,
-    in_name: String,
-    in_address: String,
-    in_cmd: String,
-    in_dir: String,
-    in_reserved: bool,
-    error: Option<String>,
-    filter: String,
-    search_active: bool,
 }
 
 impl cosmic::Application for AppModel {
@@ -208,7 +1027,8 @@ impl cosmic::Application for AppModel {
         core: cosmic::Core,
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
-        let (config, config_ctx) = match cosmic::cosmic_config::Config::new(APP_ID, Config::VERSION) {
+        let (config, config_ctx) = match cosmic::cosmic_config::Config::new(APP_ID, Config::VERSION)
+        {
             Ok(ctx) => match Config::get_entry(&ctx) {
                 Ok(config) => (config, Some(ctx)),
                 Err((_errors, config)) => (config, Some(ctx)),
@@ -247,9 +1067,10 @@ impl cosmic::Application for AppModel {
             in_reserved: false,
             error: services_corrupt.then(|| CORRUPT_CONFIG_MSG.to_string()),
             filter: String::new(),
-            search_active: false,
+            hover: None,
         };
 
+        // First-run import from CBar's localports config.
         if !app.services_corrupt
             && app.services.is_empty()
             && let Some(imported) = cbar::load_services()
@@ -260,6 +1081,7 @@ impl cosmic::Application for AppModel {
             }
         }
 
+        // Synchronize initial port reservations for any stopped services
         services::sync_reservations(&app.services);
 
         (
@@ -281,7 +1103,9 @@ impl cosmic::Application for AppModel {
     }
 
     fn view_window(&self, _id: Id) -> Element<'_, Self::Message> {
-        // 1. Log viewer
+        let spacing = cosmic::theme::spacing();
+
+        // 1. Log viewer view
         if let Some(log_id) = self.logs_open.as_ref() {
             let name = self
                 .services
@@ -290,15 +1114,21 @@ impl cosmic::Application for AppModel {
                 .map(|s| s.name.clone())
                 .unwrap_or_else(|| log_id.clone());
 
-            let header = widget::row::with_capacity(2)
+            let header = widget::row::with_capacity(3)
                 .align_y(cosmic::iced::Alignment::Center)
-                .spacing(8.0)
-                .width(Length::Fill)
+                .spacing(spacing.space_xs)
+                .push(flat_key_button(
+                    "go-previous-symbolic",
+                    "Back to Lazy Ports",
+                    Message::HideLogs,
+                ))
                 .push(
-                    widget::button::icon(icon::from_name("go-previous-symbolic").size(16))
-                        .on_press(Message::HideLogs),
-                )
-                .push(widget::Text::new(format!("{name} Logs")).size(16.0).font(cosmic::font::semibold()));
+                    widget::Text::new(format!("{name} Logs"))
+                        .size(16.0)
+                        .font(cosmic::font::semibold())
+                        .class(cosmic::theme::Text::Color(COLOR_BRIGHT))
+                        .width(Length::Fill),
+                );
 
             let log_text = if self.log_text.is_empty() {
                 fl!("log-empty")
@@ -306,91 +1136,150 @@ impl cosmic::Application for AppModel {
                 self.log_text.clone()
             };
 
-            let content = widget::column::with_capacity(2)
-                .spacing(8.0)
+            let log_view = widget::container(
+                widget::scrollable(
+                    widget::text::body(log_text)
+                        .font(cosmic::font::mono())
+                        .size(11.5)
+                        .class(cosmic::theme::Text::Color(COLOR_TEXT2))
+                        .width(Length::Fill),
+                )
+                .class(cosmic::theme::style::iced::Scrollable::Minimal)
+                .height(Length::Fill),
+            )
+            .padding(10)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .class(panel_plate(COLOR_VIEWPORT, 6.0));
+
+            let content = widget::column::with_capacity(4)
+                .spacing(spacing.space_xs)
                 .width(Length::Fill)
-                .push(header)
+                .height(Length::Fill)
                 .push(
-                    widget::scrollable(
-                        widget::Text::new(log_text).size(12.0).width(Length::Fill),
-                    )
-                    .height(Length::Fixed(400.0)),
+                    widget::container(header)
+                        .padding([10, 14])
+                        .width(Length::Fill)
+                        .class(panel_plate(COLOR_PANEL, 0.0)),
+                )
+                .push(seam())
+                .push(
+                    widget::container(log_view)
+                        .padding([8, 12])
+                        .width(Length::Fill)
+                        .height(Length::Fill),
                 );
 
-            let padded = widget::container(content)
-                .padding([12, 14])
-                .width(Length::Fill);
+            let chassis = widget::container(content)
+                .clip(true)
+                .class(chassis_plate())
+                .width(Length::Fill)
+                .height(Length::Fill);
 
-            return self.core.applet.popup_container(padded).into();
+            return self.core.applet.popup_container(chassis).into();
         }
 
-        // 2. Settings
+        // 2. Settings / Preferences view
         if self.show_settings {
-            let header = widget::row::with_capacity(2)
+            let header = widget::row::with_capacity(3)
                 .align_y(cosmic::iced::Alignment::Center)
-                .spacing(8.0)
-                .width(Length::Fill)
+                .spacing(spacing.space_xs)
+                .push(flat_key_button(
+                    "go-previous-symbolic",
+                    "Back to Lazy Ports",
+                    Message::ToggleSettings,
+                ))
                 .push(
-                    widget::button::icon(icon::from_name("go-previous-symbolic").size(16))
-                        .on_press(Message::ToggleSettings),
-                )
-                .push(widget::Text::new(fl!("preferences")).size(16.0).font(cosmic::font::semibold()));
+                    widget::Text::new(fl!("preferences"))
+                        .size(16.0)
+                        .font(cosmic::font::semibold())
+                        .class(if self.industrial() {
+                            cosmic::theme::Text::Color(COLOR_BRIGHT)
+                        } else {
+                            cosmic::theme::Text::Default
+                        })
+                        .width(Length::Fill),
+                );
 
-            let mut pref = settings::section();
-            pref = pref.add(
+            let mut pref_section = settings::section();
+            pref_section = pref_section.add(
                 settings::item::builder("Refresh Rate")
                     .description("Background polling frequency for listening ports")
                     .control(
                         widget::row::with_capacity(3)
-                            .spacing(4.0)
-                            .push(
-                                widget::button::standard(fl!("refresh-mode-realtime"))
-                                    .class(if self.config.refresh_secs == 1 {
-                                        cosmic::theme::Button::Suggested
-                                    } else {
-                                        cosmic::theme::Button::Standard
-                                    })
-                                    .on_press(Message::SetRefresh(1)),
-                            )
-                            .push(
-                                widget::button::standard(fl!("refresh-mode-balanced"))
-                                    .class(if self.config.refresh_interval() == 2 {
-                                        cosmic::theme::Button::Suggested
-                                    } else {
-                                        cosmic::theme::Button::Standard
-                                    })
-                                    .on_press(Message::SetRefresh(2)),
-                            )
-                            .push(
-                                widget::button::standard(fl!("refresh-mode-low"))
-                                    .class(if self.config.refresh_secs == 10 {
-                                        cosmic::theme::Button::Suggested
-                                    } else {
-                                        cosmic::theme::Button::Standard
-                                    })
-                                    .on_press(Message::SetRefresh(10)),
-                            ),
+                            .spacing(6)
+                            .push(refresh_rate_key(
+                                1,
+                                fl!("refresh-mode-realtime"),
+                                self.config.refresh_interval(),
+                                self.accent(),
+                            ))
+                            .push(refresh_rate_key(
+                                2,
+                                fl!("refresh-mode-balanced"),
+                                self.config.refresh_interval(),
+                                self.accent(),
+                            ))
+                            .push(refresh_rate_key(
+                                10,
+                                fl!("refresh-mode-low"),
+                                self.config.refresh_interval(),
+                                self.accent(),
+                            )),
                     ),
             );
-            pref = pref.add(
+            pref_section = pref_section.add(
                 settings::item::builder(fl!("group-ports"))
                     .description("Combine multi-port sockets from the same process")
-                    .control(widget::toggler(self.group_ports).on_toggle(|_| Message::ToggleGroup)),
+                    .control(
+                        widget::toggler(self.group_ports).on_toggle(|_| Message::ToggleGroup),
+                    ),
             );
-            pref = pref.add(
+            pref_section = pref_section.add(
                 settings::item::builder(fl!("hide-system"))
                     .description("Filter out system daemons (systemd, cups, avahi, etc.)")
-                    .control(widget::toggler(self.config.hide_system).on_toggle(|_| Message::ToggleHideSystem)),
+                    .control(
+                        widget::toggler(self.config.hide_system).on_toggle(|_| Message::ToggleHideSystem),
+                    ),
             );
-            pref = pref.add(
+
+            let industrial = self.industrial();
+            let theme_control = widget::row::with_capacity(2)
+                .spacing(6)
+                .push(
+                    widget::button::standard("System")
+                        .class(if industrial {
+                            cosmic::theme::Button::Standard
+                        } else {
+                            cosmic::theme::Button::Suggested
+                        })
+                        .on_press(Message::SetThemeMode("system".to_string())),
+                )
+                .push(
+                    widget::button::standard("Industrial")
+                        .class(if industrial {
+                            cosmic::theme::Button::Suggested
+                        } else {
+                            cosmic::theme::Button::Standard
+                        })
+                        .on_press(Message::SetThemeMode("industrial".to_string())),
+                );
+            pref_section = pref_section.add(
+                settings::item::builder("Theme")
+                    .description("System follows COSMIC; Industrial keeps the legacy dark plates")
+                    .control(theme_control),
+            );
+            pref_section = pref_section.add(
                 settings::item::builder("Colloquial Slang")
                     .description("Show playful status labels (PIMPIN', SLEEPIN', COOKED)")
-                    .control(widget::toggler(self.config.colloquial).on_toggle(|_| Message::ToggleColloquial)),
+                    .control(
+                        widget::toggler(self.config.colloquial).on_toggle(|_| Message::ToggleColloquial),
+                    ),
             );
 
             let ignored = self.config.ignored_processes();
             if !ignored.is_empty() {
-                pref = pref.add(
+                pref_section = pref_section.add(
                     settings::item::builder(format!("Ignored Processes ({})", ignored.len()))
                         .description(ignored.join(", "))
                         .control(
@@ -399,23 +1288,84 @@ impl cosmic::Application for AppModel {
                 );
             }
 
-            let about = widget::Text::new("Lazy Ports v0.1.0").size(11.0);
+            let about_footer = widget::row::with_capacity(1)
+                .width(Length::Fill)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(
+                    widget::Text::new("Lazy Ports v0.1.0 · Industrial Precision Port Manager")
+                        .size(11.0)
+                        .font(cosmic::font::mono())
+                        .class(if industrial {
+                            cosmic::theme::Text::Color(COLOR_SUBTLE)
+                        } else {
+                            cosmic::theme::Text::Default
+                        }),
+                );
+
+            if industrial {
+                let content = widget::column::with_capacity(6)
+                    .spacing(spacing.space_xs)
+                    .width(Length::Fill)
+                    .push(
+                        widget::container(header)
+                            .padding([10, 14])
+                            .width(Length::Fill)
+                            .class(panel_plate(COLOR_PANEL, 0.0)),
+                    )
+                    .push(seam())
+                    .push(
+                        widget::container(pref_section)
+                            .padding([8, 12])
+                            .width(Length::Fill),
+                    )
+                    .push(seam())
+                    .push(
+                        widget::container(about_footer)
+                            .padding([10, 14])
+                            .width(Length::Fill)
+                            .class(panel_plate(COLOR_FOOTER, 0.0)),
+                    );
+
+                let chassis = widget::container(
+                    widget::scrollable(content)
+                        .class(cosmic::theme::style::iced::Scrollable::Minimal),
+                )
+                .clip(true)
+                .class(chassis_plate())
+                .width(Length::Fill)
+                .height(Length::Fill);
+
+                return self.core.applet.popup_container(chassis).into();
+            }
 
             let content = widget::column::with_capacity(4)
-                .spacing(8.0)
+                .spacing(spacing.space_xs)
                 .width(Length::Fill)
-                .push(header)
-                .push(pref)
-                .push(about);
+                .push(
+                    widget::container(header)
+                        .padding([10, 14])
+                        .width(Length::Fill),
+                )
+                .push(
+                    widget::container(pref_section)
+                        .padding([8, 12])
+                        .width(Length::Fill),
+                )
+                .push(
+                    widget::container(about_footer)
+                        .padding([10, 14])
+                        .width(Length::Fill),
+                );
 
-            let padded = widget::container(content)
-                .padding([12, 14])
-                .width(Length::Fill);
-
-            return self.core.applet.popup_container(padded).into();
+            let scroll = widget::scrollable(
+                widget::container(content)
+                    .padding([10, 12])
+                    .width(Length::Fill),
+            );
+            return self.core.applet.popup_container(scroll).into();
         }
 
-        // 3. Add / Edit form
+        // 3. Add / Edit form view
         if self.show_add {
             let title = if self.edit_id.is_some() {
                 fl!("edit-service")
@@ -423,15 +1373,21 @@ impl cosmic::Application for AppModel {
                 fl!("add-service")
             };
 
-            let header = widget::row::with_capacity(2)
+            let header = widget::row::with_capacity(3)
                 .align_y(cosmic::iced::Alignment::Center)
-                .spacing(8.0)
-                .width(Length::Fill)
+                .spacing(spacing.space_xs)
+                .push(flat_key_button(
+                    "go-previous-symbolic",
+                    "Back to Lazy Ports",
+                    Message::HideAdd,
+                ))
                 .push(
-                    widget::button::icon(icon::from_name("go-previous-symbolic").size(16))
-                        .on_press(Message::HideAdd),
-                )
-                .push(widget::Text::new(title).size(16.0).font(cosmic::font::semibold()));
+                    widget::Text::new(title)
+                        .size(16.0)
+                        .font(cosmic::font::semibold())
+                        .class(cosmic::theme::Text::Color(COLOR_BRIGHT))
+                        .width(Length::Fill),
+                );
 
             let mut form = settings::section();
             form = form.add(
@@ -468,8 +1424,8 @@ impl cosmic::Application for AppModel {
                     .control(widget::toggler(self.in_reserved).on_toggle(Message::ReservedInput)),
             );
 
-            let mut buttons = widget::row::with_capacity(3)
-                .spacing(8.0)
+            let mut form_buttons = widget::row::with_capacity(3)
+                .spacing(spacing.space_xs)
                 .width(Length::Fill)
                 .push(
                     widget::button::standard(fl!("save"))
@@ -482,84 +1438,158 @@ impl cosmic::Application for AppModel {
                         .on_press(Message::HideAdd),
                 );
             if let Some(edit_id) = &self.edit_id {
-                buttons = buttons.push(
+                form_buttons = form_buttons.push(
                     widget::button::destructive(fl!("delete"))
                         .width(Length::Fill)
                         .on_press(Message::DeleteService(edit_id.clone())),
                 );
             }
 
+            if self.industrial() {
+                let content = widget::column::with_capacity(5)
+                    .spacing(spacing.space_xs)
+                    .width(Length::Fill)
+                    .push(
+                        widget::container(header)
+                            .padding([10, 14])
+                            .width(Length::Fill)
+                            .class(panel_plate(COLOR_PANEL, 0.0)),
+                    )
+                    .push(seam())
+                    .push(
+                        widget::container(form)
+                            .padding([8, 12])
+                            .width(Length::Fill),
+                    )
+                    .push(
+                        widget::container(form_buttons)
+                            .padding([8, 14])
+                            .width(Length::Fill),
+                    );
+
+                let chassis = widget::container(
+                    widget::scrollable(content)
+                        .class(cosmic::theme::style::iced::Scrollable::Minimal),
+                )
+                .clip(true)
+                .class(chassis_plate())
+                .width(Length::Fill)
+                .height(Length::Fill);
+
+                return self.core.applet.popup_container(chassis).into();
+            }
+
             let content = widget::column::with_capacity(3)
-                .spacing(8.0)
-                .width(Length::Fill)
-                .push(header)
-                .push(form)
-                .push(buttons);
-
-            let padded = widget::container(content)
-                .padding([12, 14])
-                .width(Length::Fill);
-
-            return self.core.applet.popup_container(padded).into();
-        }
-
-        // 4. Main view
-        let header = if self.search_active {
-            let filter_field = text_input("Filter services or ports…", &self.filter)
-                .on_input(Message::FilterInput)
-                .width(Length::Fill);
-
-            widget::row::with_capacity(3)
-                .align_y(cosmic::iced::Alignment::Center)
-                .spacing(8.0)
-                .width(Length::Fill)
-                .push(filter_field)
-                .push(
-                    widget::button::icon(icon::from_name("edit-clear-symbolic").size(16))
-                        .on_press(Message::ToggleSearch),
-                )
-                .push(
-                    widget::button::icon(icon::from_name("emblem-system-symbolic").size(16))
-                        .on_press(Message::ToggleSettings),
-                )
-        } else {
-            widget::row::with_capacity(4)
-                .align_y(cosmic::iced::Alignment::Center)
-                .spacing(8.0)
+                .spacing(spacing.space_xs)
                 .width(Length::Fill)
                 .push(
-                    widget::button::icon(icon::from_name("edit-find-symbolic").size(16))
-                        .on_press(Message::ToggleSearch),
-                )
-                .push(
-                    widget::Text::new(fl!("app-title"))
-                        .size(16.0)
-                        .font(cosmic::font::semibold())
+                    widget::container(header)
+                        .padding([10, 14])
                         .width(Length::Fill),
                 )
                 .push(
-                    widget::button::icon(icon::from_name("emblem-system-symbolic").size(16))
-                        .on_press(Message::ToggleSettings),
+                    widget::container(form)
+                        .padding([8, 12])
+                        .width(Length::Fill),
                 )
-        };
+                .push(
+                    widget::container(form_buttons)
+                        .padding([8, 14])
+                        .width(Length::Fill),
+                );
 
-        let mut scroll_content = widget::column::with_capacity(20).spacing(10.0).width(Length::Fill);
-
-        if let Some(error) = &self.error {
-            scroll_content = scroll_content.push(widget::Text::new(error.clone()).size(11.0));
-        }
-        if self.services_corrupt {
-            scroll_content = scroll_content.push(
-                widget::button::standard(String::from("Reset config"))
-                    .on_press(Message::ResetCorruptConfig),
+            let scroll = widget::scrollable(
+                widget::container(content)
+                    .padding([10, 12])
+                    .width(Length::Fill),
             );
+            return self.core.applet.popup_container(scroll).into();
         }
 
+        // 4. Main view — Industrial Precision instrument chassis
+        let mut root = widget::column::with_capacity(16).spacing(6.0);
         let filter_query = self.filter.trim().to_lowercase();
         let matches_filter = |name: &str, needle: &str| -> bool {
             needle.is_empty() || name.to_lowercase().contains(needle)
         };
 
+        // Header: ringed magnifier + borderless filter + flat settings key +
+        // title. No brand tile — panel popups don't carry logos, and a chip
+        // that looks like a button but isn't is a dead affordance. The search
+        // chrome lives on the magnifier ring (the hold-in spot), not on a
+        // full-width plate; there is no placeholder text.
+        let filter_field = text_input("", &self.filter)
+            .on_input(Message::FilterInput)
+            .size(12.0)
+            .style(filter_input_class())
+            .width(Length::Fill);
+
+        let search_plate = widget::row::with_capacity(2)
+            .align_y(cosmic::iced::Alignment::Center)
+            .spacing(8.0)
+            .push(
+                widget::container(tinted_icon("edit-find-symbolic", 14, COLOR_TEXT2))
+                    .width(Length::Fixed(26.0))
+                    .height(Length::Fixed(26.0))
+                    .align_x(cosmic::iced::Alignment::Center)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .class(search_ring()),
+            )
+            .push(filter_field);
+
+        let header = widget::row::with_capacity(3)
+            .align_y(cosmic::iced::Alignment::Center)
+            .spacing(spacing.space_xs)
+            .width(Length::Fill)
+            .push(
+                widget::Text::new(fl!("app-title"))
+                    .size(15.0)
+                    .font(cosmic::font::semibold())
+                    .class(if self.industrial() {
+                        cosmic::theme::Text::Color(COLOR_BRIGHT)
+                    } else {
+                        cosmic::theme::Text::Default
+                    }),
+            )
+            .push(widget::container(search_plate).width(Length::Fill))
+            .push(flat_key_button(
+                "emblem-system-symbolic",
+                "Lazy Ports settings",
+                Message::ToggleSettings,
+            ));
+
+        if self.industrial() {
+            root = root.push(
+                widget::container(header)
+                    .padding([10, 14])
+                    .width(Length::Fill)
+                    .class(panel_plate(COLOR_PANEL, 0.0)),
+            );
+            root = root.push(seam());
+        } else {
+            root = root.push(
+                widget::container(header)
+                    .padding([10, 14])
+                    .width(Length::Fill),
+            );
+        }
+
+        if let Some(error) = &self.error {
+            root = root.push(
+                widget::Text::new(error.clone())
+                    .size(11.0)
+                    .font(cosmic::font::mono())
+                    .class(cosmic::theme::Text::Color(LED_AMBER)),
+            );
+        }
+        if self.services_corrupt {
+            root = root.push(
+                widget::button::standard(String::from("Reset config"))
+                    .on_press(Message::ResetCorruptConfig),
+            );
+        }
+
+        // Partition pinned services into active (running/starting) and inactive (stopped/failed)
         let (active_services, inactive_services): (Vec<&ServiceConfig>, Vec<&ServiceConfig>) = self
             .services
             .iter()
@@ -569,36 +1599,35 @@ impl cosmic::Application for AppModel {
                 matches!(st, SvcState::Running | SvcState::Starting)
             });
 
+        // 1. Active services
         if !active_services.is_empty() {
-            let mut list = widget::list_column();
             for cfg in &active_services {
-                list = list.add(self.render_service_row(cfg));
+                root = root.push(self.render_service_card(cfg));
             }
-            scroll_content = scroll_content.push(list);
         } else if self.services.is_empty() {
-            scroll_content = scroll_content.push(self.empty_state(fl!("no-services")));
+            root = root.push(self.empty_state(fl!("no-services")));
         } else if filter_query.is_empty() {
-            scroll_content = scroll_content.push(self.empty_state(fl!("no-active-services")));
+            root = root.push(self.empty_state(fl!("no-active-services")));
         } else {
-            scroll_content = scroll_content.push(self.empty_state("NO ACTIVE SOCKETS MATCHING FILTER".to_string()));
+            root = root.push(self.empty_state("NO ACTIVE SOCKETS MATCHING FILTER".to_string()));
         }
 
+        // 2. Inactive services rail
         if !inactive_services.is_empty() {
-            scroll_content = scroll_content.push(self.section_rail(
+            root = root.push(self.section_rail(
                 LED_PURPLE,
                 &format!("{} ({})", fl!("inactive-services"), inactive_services.len()),
                 self.show_inactive,
                 Message::ToggleShowInactive,
             ));
             if self.show_inactive {
-                let mut list = widget::list_column();
                 for cfg in &inactive_services {
-                    list = list.add(self.render_inactive_service_row(cfg));
+                    root = root.push(self.render_inactive_service_row(cfg));
                 }
-                scroll_content = scroll_content.push(list);
             }
         }
 
+        // 3. Discovered ports rail
         let ignored = self.config.ignored_processes();
         let pinned_ports: HashSet<u16> = self
             .services
@@ -612,17 +1641,12 @@ impl cosmic::Application for AppModel {
             .filter(|p| !ignored.contains(&p.process))
             .filter(|p| !services::is_port_reserved(p.port))
             .filter(|p| !self.config.hide_system || !p.is_system)
-            .filter(|p| {
-                matches_filter(
-                    &format!("{} {} {}", p.display_name, p.process, p.port),
-                    &filter_query,
-                )
-            })
+            .filter(|p| matches_filter(&format!("{} {} {}", p.display_name, p.process, p.port), &filter_query))
             .collect();
 
         let unpinned_count = unpinned.len();
 
-        scroll_content = scroll_content.push(self.section_rail(
+        root = root.push(self.section_rail(
             LED_CYAN,
             &format!("{} ({})", fl!("discovered-ports"), unpinned_count),
             self.config.show_ports,
@@ -631,14 +1655,13 @@ impl cosmic::Application for AppModel {
 
         if self.config.show_ports {
             if unpinned.is_empty() {
-                scroll_content = scroll_content.push(self.empty_state(fl!("no-ports")));
+                root = root.push(self.empty_state(fl!("no-ports")));
             } else if self.group_ports {
-                let mut list = widget::list_column();
                 let groups = ports::group_by_process_refs(&unpinned);
                 for group in groups.iter().take(15) {
                     let port_nums: Vec<u16> = group.ports.iter().map(|p| p.port).collect();
                     let first_port = group.ports.first().copied().cloned();
-                    list = list.add(self.render_discovered_group_row(
+                    root = root.push(self.render_compact_discovered_group_row(
                         format!("group-{}-{}", group.process, group.display_name),
                         group.display_name.clone(),
                         group.process.clone(),
@@ -648,37 +1671,68 @@ impl cosmic::Application for AppModel {
                         first_port,
                     ));
                 }
-                scroll_content = scroll_content.push(list);
             } else {
-                let mut list = widget::list_column();
                 for p in unpinned.iter().take(20) {
-                    list = list.add(self.render_discovered_port_row(p));
+                    root = root.push(self.render_compact_discovered_port_row(p));
                 }
-                scroll_content = scroll_content.push(list);
             }
         }
 
+        // Footer: Rescan + Bind (left) · Quit (right). Refresh-rate selection
+        // lives in the settings view; the footer expansion read as a mystery
+        // window, not a dropdown.
         let footer = widget::row::with_capacity(4)
-            .spacing(8.0)
+            .spacing(spacing.space_xxs)
             .align_y(cosmic::iced::Alignment::Center)
-            .width(Length::Fill)
-            .push(widget::button::standard("Rescan").on_press(Message::Tick))
-            .push(widget::button::suggested("Add Service").on_press(Message::ShowAdd))
+            .push(key_glyph_text_button(
+                Some("view-refresh-symbolic"),
+                "Rescan",
+                Message::Tick,
+            ))
+            .push(key_glyph_text_button(
+                Some("list-add-symbolic"),
+                "Add Service",
+                Message::ShowAdd,
+            ))
             .push(widget::Space::new().width(Length::Fill))
-            .push(widget::button::text("Quit").on_press(Message::QuitApplet));
+            .push(key_text_button("Quit", Message::QuitApplet));
+        if self.industrial() {
+            root = root.push(seam());
+            root = root.push(
+                widget::container(footer)
+                    .padding([10, 14])
+                    .width(Length::Fill)
+                    .class(panel_plate(COLOR_FOOTER, 0.0)),
+            );
+        } else {
+            root = root.push(
+                widget::container(footer)
+                    .padding([10, 14])
+                    .width(Length::Fill),
+            );
+        }
 
-        let main_layout = widget::column::with_capacity(3)
-            .spacing(10.0)
+        // Industrial keeps the dark instrument chassis; system mode lets the
+        // COSMIC popup background (via `applet::style()`) show through.
+        if self.industrial() {
+            let body = widget::container(root).padding([10, 12]).width(Length::Fill);
+
+            let chassis = widget::container(
+                widget::scrollable(body).class(cosmic::theme::style::iced::Scrollable::Minimal),
+            )
+            .clip(true)
+            .class(chassis_plate())
             .width(Length::Fill)
-            .push(header)
-            .push(widget::scrollable(scroll_content).height(Length::Fill))
-            .push(footer);
+            .height(Length::Fill);
 
-        let padded = widget::container(main_layout)
-            .padding([12, 14])
+            return self.core.applet.popup_container(chassis).into();
+        }
+
+        let body = widget::container(root)
+            .padding([10, 12])
             .width(Length::Fill);
-
-        self.core.applet.popup_container(padded).into()
+        let scroll = widget::scrollable(body);
+        self.core.applet.popup_container(scroll).into()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
@@ -730,6 +1784,11 @@ impl cosmic::Application for AppModel {
                 return if let Some(p) = self.popup.take() {
                     self.show_inactive = false;
                     self.logs_open = None;
+                    // Defer the destroy until after the pointer is released.
+                    // cosmic-comp holds an active pointer grab while the
+                    // applet button is pressed, and destroying the grabbed
+                    // popup inside that press leaves an orphaned seat grab
+                    // that silently swallows every later click.
                     self.popup_closing = Some(p);
                     Task::perform(
                         async {
@@ -751,10 +1810,10 @@ impl cosmic::Application for AppModel {
                         None,
                     );
                     popup_settings.positioner.size_limits = Limits::NONE
-                        .max_width(420.0)
-                        .min_width(320.0)
+                        .max_width(476.0)
+                        .min_width(476.0)
                         .min_height(200.0)
-                        .max_height(960.0);
+                        .max_height(1080.0);
                     get_popup(popup_settings)
                 };
             }
@@ -831,12 +1890,6 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleSettings => {
                 self.show_settings = !self.show_settings;
-            }
-            Message::ToggleSearch => {
-                self.search_active = !self.search_active;
-                if !self.search_active {
-                    self.filter.clear();
-                }
             }
             Message::ToggleShowPorts => {
                 self.config.show_ports = !self.config.show_ports;
@@ -997,11 +2050,20 @@ impl cosmic::Application for AppModel {
                     let _ = ctx.set("refresh_secs", secs);
                 }
             }
-            Message::FilterInput(v) => self.filter = v,
-            Message::FilterTo(v) => {
-                self.filter = v;
-                self.search_active = true;
+            Message::SetThemeMode(name) => {
+                let normalised = if name.trim().eq_ignore_ascii_case("industrial") {
+                    "industrial".to_string()
+                } else {
+                    "system".to_string()
+                };
+                self.config.theme_mode = normalised;
+                if let Some(ctx) = &self.config_ctx {
+                    let _ = ctx.set("theme_mode", self.config.theme_mode.clone());
+                }
             }
+            Message::FilterInput(v) => self.filter = v,
+            Message::FilterTo(v) => self.filter = v,
+            Message::HoverRow(id) => self.hover = id,
             Message::NameInput(v) => self.in_name = v,
             Message::AddressInput(v) => self.in_address = v,
             Message::CmdInput(v) => self.in_cmd = v,
@@ -1107,15 +2169,34 @@ impl cosmic::Application for AppModel {
 }
 
 impl AppModel {
+    /// Centered mono empty state on the viewport plate.
     fn empty_state<'a>(&'a self, msg: String) -> Element<'a, Message> {
-        widget::container(widget::Text::new(msg).size(13.0))
-            .padding([14, 16])
+        if self.industrial() {
+            return widget::container(
+                widget::Text::new(msg)
+                    .size(12.0)
+                    .font(cosmic::font::mono())
+                    .class(cosmic::theme::Text::Color(COLOR_SUBTLE)),
+            )
+            .padding(20)
             .width(Length::Fill)
             .center_x(Length::Fill)
-            .class(cosmic::theme::Container::Card)
-            .into()
+            .class(panel_plate(COLOR_VIEWPORT, 4.0))
+            .into();
+        }
+        widget::container(
+            widget::Text::new(msg)
+                .size(12.0)
+                .font(cosmic::font::mono()),
+        )
+        .padding(20)
+        .width(Length::Fill)
+        .center_x(Length::Fill)
+        .class(cosmic::theme::Container::Secondary)
+        .into()
     }
 
+    /// Compact collapsible section rail: LED · title · show/hide key.
     fn section_rail(
         &self,
         led: cosmic::iced::Color,
@@ -1123,22 +2204,49 @@ impl AppModel {
         open: bool,
         toggle: Message,
     ) -> Element<'_, Message> {
-        widget::row::with_capacity(4)
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(8.0)
+        let spacing = cosmic::theme::spacing();
+        if self.industrial() {
+            return widget::container(
+                widget::row::with_capacity(3)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .spacing(spacing.space_xxs)
+                    .push(status_led(led))
+                    .push(
+                        widget::Text::new(title.to_string())
+                            .size(12.0)
+                            .font(cosmic::font::semibold())
+                            .class(cosmic::theme::Text::Color(COLOR_BRIGHT))
+                            .width(Length::Fill),
+                    )
+                    .push(key_text_button(
+                        if open { fl!("hide") } else { fl!("show") },
+                        toggle,
+                    )),
+            )
+            .padding([6, 12])
             .width(Length::Fill)
-            .push(status_led(led))
-            .push(
-                widget::Text::new(title.to_string())
-                    .size(13.0)
-                    .font(cosmic::font::semibold())
-                    .width(Length::Fill),
-            )
-            .push(
-                widget::button::text(if open { fl!("hide") } else { fl!("show") })
-                    .on_press(toggle),
-            )
-            .into()
+            .class(panel_plate(COLOR_PANEL, 0.0))
+            .into();
+        }
+        widget::container(
+            widget::row::with_capacity(3)
+                .align_y(cosmic::iced::Alignment::Center)
+                .spacing(spacing.space_xxs)
+                .push(status_led(led))
+                .push(
+                    widget::Text::new(title.to_string())
+                        .size(12.0)
+                        .font(cosmic::font::semibold())
+                        .width(Length::Fill),
+                )
+                .push(key_text_button(
+                    if open { fl!("hide") } else { fl!("show") },
+                    toggle,
+                )),
+        )
+        .padding([6, 12])
+        .width(Length::Fill)
+        .into()
     }
 
     fn save_service(&mut self) -> Result<(), String> {
@@ -1207,6 +2315,7 @@ impl AppModel {
         Ok(())
     }
 
+    /// Finds the listening port matching a service's configured address port.
     fn matching_port<'a>(
         &self,
         cfg: &ServiceConfig,
@@ -1216,6 +2325,11 @@ impl AppModel {
         ports.iter().find(|p| p.port == port)
     }
 
+    /// Determines the effective visual state of a service:
+    /// - Starting: if tracked as Starting in states map
+    /// - Running: if tracked as Running in states map, or if matching port is listening
+    /// - Failed: if tracked as Failed in states map
+    /// - Stopped: default
     fn service_status<'a>(
         &self,
         cfg: &ServiceConfig,
@@ -1259,34 +2373,175 @@ impl AppModel {
         Ok(())
     }
 
-    fn lingo(&self, straight: impl Into<String>, slang: &str) -> String {
-        if self.config.colloquial {
-            slang.to_string()
-        } else {
-            straight.into()
+    fn render_service_drawer<'a>(
+        &'a self,
+        cfg: &'a ServiceConfig,
+        is_running: bool,
+    ) -> Option<Element<'a, Message>> {
+        let spacing = cosmic::theme::spacing();
+        let mut info_col = widget::column::with_capacity(3)
+            .spacing(spacing.space_xxxs)
+            .width(Length::Fill);
+
+        if let Some(cmd) = &cfg.start_command {
+            info_col = info_col.push(
+                widget::row::with_capacity(2)
+                    .spacing(spacing.space_xxs)
+                    .width(Length::Fill)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(faint_mono("CMD"))
+                    .push(
+                        widget::container(dim_mono(cmd.clone()))
+                            .width(Length::Fill)
+                            .clip(true),
+                    ),
+            );
         }
+        if let Some(dir) = &cfg.working_dir {
+            info_col = info_col.push(
+                widget::row::with_capacity(2)
+                    .spacing(spacing.space_xxs)
+                    .width(Length::Fill)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(faint_mono("DIR"))
+                    .push(
+                        widget::container(dim_mono(dir.clone()))
+                            .width(Length::Fill)
+                            .clip(true),
+                    ),
+            );
+        }
+        if cfg.start_command.is_none() && cfg.working_dir.is_none() {
+            info_col = info_col.push(dim_mono("No start command configured"));
+        }
+
+        let lock_color = if cfg.reserved {
+            KeyColor::Blue
+        } else {
+            KeyColor::Neutral
+        };
+        let lock_tip = if cfg.reserved {
+            "Port reserved (click to unlock)"
+        } else {
+            "Reserve port (hold when stopped)"
+        };
+
+        // Compact toolbar of milled keys
+        let mut action_row = widget::row::with_capacity(7)
+            .spacing(6.0)
+            .align_y(cosmic::iced::Alignment::Center);
+
+        // Move Up / Move Down for reordering
+        action_row = action_row.push(key_button(
+            "go-up-symbolic",
+            "Move up in list",
+            self.accent(),
+            Message::MoveServiceUp(cfg.id.clone()),
+            KeyColor::Neutral,
+        ));
+        action_row = action_row.push(key_button(
+            "go-down-symbolic",
+            "Move down in list",
+            self.accent(),
+            Message::MoveServiceDown(cfg.id.clone()),
+            KeyColor::Neutral,
+        ));
+
+        if is_running && services::is_managed(&cfg.id) {
+            action_row = action_row.push(key_button(
+                "view-refresh-symbolic",
+                "Restart process",
+                self.accent(),
+                Message::RestartService(cfg.id.clone()),
+                KeyColor::Blue,
+            ));
+        }
+
+        action_row = action_row.push(key_button(
+            "utilities-terminal-symbolic",
+            "View live logs",
+            self.accent(),
+            Message::ShowLogs(cfg.id.clone()),
+            KeyColor::Neutral,
+        ));
+
+        action_row = action_row.push(key_button(
+            "changes-prevent-symbolic",
+            lock_tip,
+            self.accent(),
+            Message::ToggleReservePort(cfg.id.clone()),
+            lock_color,
+        ));
+
+        action_row = action_row.push(key_button(
+            "document-edit-symbolic",
+            "Edit service",
+            self.accent(),
+            Message::EditService(cfg.id.clone()),
+            KeyColor::Neutral,
+        ));
+
+        action_row = action_row.push(widget::Space::new().width(Length::Fill));
+
+        action_row = action_row.push(key_button(
+            "user-trash-symbolic",
+            "Delete / Unpin service",
+            self.accent(),
+            Message::DeleteService(cfg.id.clone()),
+            KeyColor::Danger,
+        ));
+
+        let drawer_col = widget::column::with_capacity(3)
+            .spacing(6.0)
+            .width(Length::Fill)
+            .push(info_col)
+            .push(action_row);
+
+        Some(
+            widget::container(drawer_col)
+                .width(Length::Fill)
+                .padding([6, 10])
+                .class(drawer_plate())
+                .into(),
+        )
     }
 
-    fn render_service_row<'a>(&'a self, cfg: &'a ServiceConfig) -> Element<'a, Message> {
+    fn render_service_card<'a>(&'a self, cfg: &'a ServiceConfig) -> Element<'a, Message> {
         let (state, matching_lp) = self.service_status(cfg, &self.ports);
         let is_expanded = self.expanded_service.as_deref() == Some(&cfg.id);
         let port_num = cfg.host_port().map(|(_, p)| p).unwrap_or(0);
         let is_reserved = cfg.reserved && services::is_port_reserved(port_num);
         let is_running = matches!(state, SvcState::Running | SvcState::Starting);
 
-        let led_color = match &state {
-            SvcState::Running | SvcState::Starting => LED_GREEN,
-            SvcState::Failed(_) => LED_AMBER,
+        // Status LED and port color: Green for Active, Yellow/Amber for Failed/Crashed
+        let (led_color, port_color) = match &state {
+            SvcState::Running | SvcState::Starting => (LED_GREEN, LED_GREEN),
+            SvcState::Failed(_) => (LED_AMBER, LED_AMBER),
             SvcState::Stopped => {
                 if is_reserved {
-                    LED_CYAN
+                    (LED_CYAN, LED_CYAN)
                 } else {
-                    LED_PURPLE
+                    (LED_PURPLE, LED_PURPLE)
                 }
             }
         };
 
-        let state_label = match &state {
+        // Process tag for the badge chip.
+        let badge_label = if let Some(lp) = matching_lp {
+            lp.process.clone()
+        } else if let Some(cmd) = &cfg.start_command {
+            cmd.split_whitespace()
+                .next()
+                .unwrap_or("PINNED")
+                .split('/')
+                .next_back()
+                .unwrap_or("PINNED")
+                .to_string()
+        } else {
+            "PINNED".to_string()
+        };
+
+        let pid_or_state: String = match &state {
             SvcState::Running => match matching_lp {
                 Some(lp) => format!("PID {}", lp.pid),
                 None => self.lingo("RUNNING".to_string(), "PIMPIN'"),
@@ -1302,17 +2557,31 @@ impl AppModel {
             SvcState::Failed(e) => {
                 let short: String = e.chars().take(8).collect();
                 let dots = if e.chars().count() > 8 { "…" } else { "" };
-                self.lingo(
-                    format!("BROKE: {short}{dots}"),
-                    &format!("COOKED: {short}{dots}"),
-                )
+                self.lingo(format!("BROKE: {short}{dots}"), &format!("COOKED: {short}{dots}"))
             }
         };
 
-        let mut actions = widget::row::with_capacity(3)
-            .spacing(4.0)
-            .align_y(cosmic::iced::Alignment::Center);
+        let endpoint = if port_num > 0 {
+            endpoint_line(
+                "localhost",
+                port_num.to_string(),
+                pid_or_state,
+                port_color,
+            )
+        } else {
+            dim_mono(pid_or_state)
+        };
 
+        let title = link_title(cfg.name.clone(), cfg.address.clone());
+
+        let pin_btn = Some(pin_circle_button(
+            Message::EditService(cfg.id.clone()),
+            true,
+            self.accent(),
+        ));
+
+        // Action keys: start-stop | expand
+        let mut actions = widget::row::with_capacity(2).spacing(6.0);
         if is_running {
             let stop_msg = if services::is_managed(&cfg.id) {
                 Message::StopService(cfg.id.clone())
@@ -1321,171 +2590,63 @@ impl AppModel {
             } else {
                 Message::StopService(cfg.id.clone())
             };
-            actions = actions.push(tip(
-                widget::button::icon(icon::from_name("media-playback-stop-symbolic").size(14))
-                    .on_press(stop_msg),
+            actions = actions.push(key_button(
+                "media-playback-stop-symbolic",
                 "Stop process",
+                self.accent(),
+                stop_msg,
+                KeyColor::Danger,
             ));
         } else if cfg.can_start() {
-            actions = actions.push(tip(
-                widget::button::icon(icon::from_name("media-playback-start-symbolic").size(14))
-                    .on_press(Message::StartService(cfg.id.clone())),
+            actions = actions.push(key_button(
+                "media-playback-start-symbolic",
                 "Start service",
+                self.accent(),
+                Message::StartService(cfg.id.clone()),
+                KeyColor::Green,
             ));
         }
-
-        let expand_icon = if is_expanded { "go-up-symbolic" } else { "go-down-symbolic" };
-        actions = actions.push(tip(
-            widget::button::icon(icon::from_name(expand_icon).size(14))
-                .on_press(Message::ToggleExpandService(cfg.id.clone())),
-            "Details",
+        let expand_icon = if is_expanded {
+            "go-up-symbolic"
+        } else {
+            "go-down-symbolic"
+        };
+        actions = actions.push(key_button(
+            expand_icon,
+            "Expand / collapse service details",
+            self.accent(),
+            Message::ToggleExpandService(cfg.id.clone()),
+            KeyColor::Neutral,
         ));
 
-        let title_row = widget::row::with_capacity(3)
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(8.0)
-            .width(Length::Fill)
-            .push(status_led(led_color))
-            .push(
-                widget::button::text(cfg.name.clone())
-                    .on_press(Message::Open(cfg.address.clone())),
-            )
-            .push(widget::Space::new().width(Length::Fill))
-            .push(widget::Text::new(state_label).size(11.0))
-            .push(actions);
+        let badge = filter_badge(badge_label.clone(), badge_label);
 
-        let port_text = if port_num > 0 {
-            format!("localhost:{port_num}")
+        let drawer = if is_expanded {
+            self.render_service_drawer(cfg, is_running)
         } else {
-            cfg.address.clone()
+            None
         };
 
-        let detail_row = widget::row::with_capacity(2)
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(8.0)
-            .width(Length::Fill)
-            .push(widget::Text::new(port_text).size(12.0).width(Length::Fill));
-
-        let mut content = widget::column::with_capacity(3)
-            .spacing(4.0)
-            .width(Length::Fill)
-            .push(title_row)
-            .push(detail_row);
-
-        if is_expanded {
-            if let Some(drawer) = self.render_service_drawer(cfg, is_running) {
-                content = content.push(drawer);
-            }
-        }
-
-        widget::container(content)
-            .padding([6, 8])
-            .width(Length::Fill)
-            .into()
-    }
-
-    fn render_service_drawer<'a>(
-        &'a self,
-        cfg: &'a ServiceConfig,
-        is_running: bool,
-    ) -> Option<Element<'a, Message>> {
-        let mut info = widget::column::with_capacity(3)
-            .spacing(2.0)
-            .width(Length::Fill);
-
-        if let Some(cmd) = &cfg.start_command {
-            info = info.push(
-                widget::row::with_capacity(2)
-                    .spacing(8.0)
-                    .width(Length::Fill)
-                    .push(widget::Text::new("CMD").size(10.0))
-                    .push(widget::Text::new(cmd.clone()).size(11.0).width(Length::Fill)),
-            );
-        }
-        if let Some(dir) = &cfg.working_dir {
-            info = info.push(
-                widget::row::with_capacity(2)
-                    .spacing(8.0)
-                    .width(Length::Fill)
-                    .push(widget::Text::new("DIR").size(10.0))
-                    .push(widget::Text::new(dir.clone()).size(11.0).width(Length::Fill)),
-            );
-        }
-        if cfg.start_command.is_none() && cfg.working_dir.is_none() {
-            info = info.push(widget::Text::new("No start command configured").size(11.0));
-        }
-
-        let mut toolbar = widget::row::with_capacity(7)
-            .spacing(4.0)
-            .align_y(cosmic::iced::Alignment::Center);
-
-        toolbar = toolbar.push(tip(
-            widget::button::icon(icon::from_name("go-up-symbolic").size(14))
-                .on_press(Message::MoveServiceUp(cfg.id.clone())),
-            "Move up",
-        ));
-        toolbar = toolbar.push(tip(
-            widget::button::icon(icon::from_name("go-down-symbolic").size(14))
-                .on_press(Message::MoveServiceDown(cfg.id.clone())),
-            "Move down",
-        ));
-
-        if is_running && services::is_managed(&cfg.id) {
-            toolbar = toolbar.push(tip(
-                widget::button::icon(icon::from_name("view-refresh-symbolic").size(14))
-                    .on_press(Message::RestartService(cfg.id.clone())),
-                "Restart",
-            ));
-        }
-
-        toolbar = toolbar.push(tip(
-            widget::button::icon(icon::from_name("utilities-terminal-symbolic").size(14))
-                .on_press(Message::ShowLogs(cfg.id.clone())),
-            "Logs",
-        ));
-
-        let lock_tip = if cfg.reserved {
-            "Unlock port"
-        } else {
-            "Reserve port"
-        };
-        toolbar = toolbar.push(tip(
-            widget::button::icon(icon::from_name("changes-prevent-symbolic").size(14))
-                .on_press(Message::ToggleReservePort(cfg.id.clone())),
-            lock_tip,
-        ));
-
-        toolbar = toolbar.push(tip(
-            widget::button::icon(icon::from_name("document-edit-symbolic").size(14))
-                .on_press(Message::EditService(cfg.id.clone())),
-            "Edit",
-        ));
-
-        toolbar = toolbar.push(widget::Space::new().width(Length::Fill));
-
-        toolbar = toolbar.push(tip(
-            widget::button::icon(icon::from_name("user-trash-symbolic").size(14))
-                .class(cosmic::theme::Button::Destructive)
-                .on_press(Message::DeleteService(cfg.id.clone())),
-            "Delete",
-        ));
-
-        Some(
-            widget::column::with_capacity(2)
-                .spacing(6.0)
-                .width(Length::Fill)
-                .push(info)
-                .push(toolbar)
-                .into(),
+        card_shell(
+            led_color,
+            title,
+            badge,
+            pin_btn,
+            endpoint,
+            actions.into(),
+            drawer,
+            self.hover.as_deref() == Some(cfg.id.as_str()),
+            cfg.id.clone(),
+            self.industrial(),
         )
     }
 
     fn render_inactive_service_row<'a>(&'a self, cfg: &'a ServiceConfig) -> Element<'a, Message> {
+        let industrial = self.industrial();
         let is_expanded = self.expanded_service.as_deref() == Some(&cfg.id);
         let (state, _) = self.service_status(cfg, &self.ports);
         let port_num = cfg.host_port().map(|(_, p)| p).unwrap_or(0);
         let is_reserved = cfg.reserved && services::is_port_reserved(port_num);
-
         let led_color = match &state {
             SvcState::Failed(_) => LED_AMBER,
             SvcState::Running | SvcState::Starting => LED_GREEN,
@@ -1498,156 +2659,206 @@ impl AppModel {
             }
         };
 
-        let mut actions = widget::row::with_capacity(3)
-            .spacing(4.0)
-            .align_y(cosmic::iced::Alignment::Center);
+        let title = link_title(cfg.name.clone(), cfg.address.clone());
 
+        let badge: Element<'a, Message> = if is_reserved {
+            themed_badge("LOCKED".to_string(), industrial)
+        } else {
+            widget::Space::new().width(Length::Shrink).into()
+        };
+
+        let state_label = if is_reserved {
+            "RESERVED".to_string()
+        } else {
+            self.lingo("STOPPED".to_string(), "SLEEPIN'")
+        };
+
+        let port_label = if port_num > 0 {
+            format!(":{port_num}")
+        } else {
+            cfg.address.clone()
+        };
+
+        let endpoint = themed_endpoint(port_label, state_label, LED_PURPLE, industrial);
+
+        let mut actions = widget::row::with_capacity(2).spacing(6.0);
         if cfg.can_start() {
-            actions = actions.push(tip(
-                widget::button::icon(icon::from_name("media-playback-start-symbolic").size(14))
-                    .on_press(Message::StartService(cfg.id.clone())),
+            actions = actions.push(key_button(
+                "media-playback-start-symbolic",
                 "Start service",
+                self.accent(),
+                Message::StartService(cfg.id.clone()),
+                KeyColor::Green,
             ));
         }
 
-        let expand_icon = if is_expanded { "go-up-symbolic" } else { "go-down-symbolic" };
-        actions = actions.push(tip(
-            widget::button::icon(icon::from_name(expand_icon).size(14))
-                .on_press(Message::ToggleExpandService(cfg.id.clone())),
-            "Details",
+        let expand_icon = if is_expanded {
+            "go-up-symbolic"
+        } else {
+            "go-down-symbolic"
+        };
+        actions = actions.push(key_button(
+            expand_icon,
+            "Service details & actions",
+            self.accent(),
+            Message::ToggleExpandService(cfg.id.clone()),
+            KeyColor::Neutral,
         ));
 
-        actions = actions.push(tip(
-            widget::button::icon(icon::from_name("document-edit-symbolic").size(14))
-                .on_press(Message::EditService(cfg.id.clone())),
-            "Edit",
+        let pin_btn = Some(pin_circle_button(
+            Message::EditService(cfg.id.clone()),
+            true,
+            self.accent(),
         ));
 
-        let title_row = widget::row::with_capacity(3)
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(8.0)
-            .width(Length::Fill)
-            .push(status_led(led_color))
-            .push(
-                widget::button::text(cfg.name.clone())
-                    .on_press(Message::Open(cfg.address.clone())),
-            )
-            .push(widget::Space::new().width(Length::Fill))
-            .push(
-                widget::Text::new(if port_num > 0 {
-                    format!(":{port_num}")
-                } else {
-                    String::new()
-                })
-                .size(11.0),
-            )
-            .push(actions);
+        let drawer = if is_expanded {
+            self.render_service_drawer(cfg, false)
+        } else {
+            None
+        };
 
-        let mut content = widget::column::with_capacity(2)
-            .spacing(4.0)
-            .width(Length::Fill)
-            .push(title_row);
-
-        if is_expanded {
-            if let Some(drawer) = self.render_service_drawer(cfg, false) {
-                content = content.push(drawer);
-            }
-        }
-
-        widget::container(content)
-            .padding([6, 8])
-            .width(Length::Fill)
-            .into()
+        card_shell(
+            led_color,
+            title,
+            badge,
+            pin_btn,
+            endpoint,
+            actions.into(),
+            drawer,
+            self.hover.as_deref() == Some(cfg.id.as_str()),
+            cfg.id.clone(),
+            industrial,
+        )
     }
 
-    fn render_discovered_port_row<'a>(
+    fn render_compact_discovered_port_row<'a>(
         &'a self,
         p: &'a ports::ListeningPort,
     ) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+        let industrial = self.industrial();
         let row_id = format!("port-{}", p.port);
         let is_expanded = self.expanded_service.as_deref() == Some(&row_id);
         let port_url = format!("http://localhost:{}", p.port);
 
-        let mut actions = widget::row::with_capacity(4)
-            .spacing(4.0)
-            .align_y(cosmic::iced::Alignment::Center);
+        let title = plain_title(p.display_name.clone(), industrial);
 
+        let badge_label = if let Some(fw) = &p.framework {
+            fw.clone()
+        } else if p.process != p.display_name {
+            p.process.clone()
+        } else {
+            String::new()
+        };
+        let badge: Element<'a, Message> = if badge_label.is_empty() {
+            widget::Space::new().width(Length::Shrink).into()
+        } else {
+            themed_badge(badge_label, industrial)
+        };
+
+        let endpoint = themed_endpoint(
+            format!(":{}", p.port),
+            format!("PID {}", p.pid),
+            LED_CYAN,
+            industrial,
+        );
+
+        let mut actions = widget::row::with_capacity(3).spacing(6.0);
         actions = actions.push(tip(
-            widget::button::icon(icon::from_name("external-link-symbolic").size(14))
+            widget::button::custom(tinted_icon("external-link-symbolic", 13, COLOR_TEXT2))
+                .padding(4)
+                .class(cosmic::theme::Button::Custom {
+                    active: Box::new(|_, _| flat_btn_style(COLOR_TEXT2)),
+                    disabled: Box::new(|_| flat_btn_style(COLOR_SUBTLE)),
+                    hovered: Box::new(|_, _| flat_btn_style(LED_CYAN)),
+                    pressed: Box::new(|_, _| flat_btn_style(COLOR_TEXT2)),
+                })
                 .on_press(Message::Open(port_url.clone())),
             format!("Open {port_url}"),
         ));
-        actions = actions.push(tip(
-            widget::button::icon(icon::from_name("media-playback-stop-symbolic").size(14))
-                .on_press(Message::KillPort(p.pid)),
+
+        actions = actions.push(key_button(
+            "media-playback-stop-symbolic",
             "Stop process",
-        ));
-        let expand_icon = if is_expanded { "go-up-symbolic" } else { "go-down-symbolic" };
-        actions = actions.push(tip(
-            widget::button::icon(icon::from_name(expand_icon).size(14))
-                .on_press(Message::ToggleExpandService(row_id.clone())),
-            "Details",
-        ));
-        actions = actions.push(tip(
-            widget::button::icon(icon::from_name("view-pin-symbolic").size(14))
-                .on_press(Message::PinPort(p.clone())),
-            "Pin as service",
+            self.accent(),
+            Message::KillPort(p.pid),
+            KeyColor::Danger,
         ));
 
-        let title_row = widget::row::with_capacity(3)
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(8.0)
-            .width(Length::Fill)
-            .push(status_led(LED_CYAN))
-            .push(widget::Text::new(format!(":{}", p.port)).size(13.0).font(cosmic::font::semibold()))
-            .push(widget::Text::new(p.display_name.clone()).size(13.0).width(Length::Fill))
-            .push(widget::Text::new(format!("PID {}", p.pid)).size(11.0))
-            .push(actions);
+        let expand_icon = if is_expanded {
+            "go-up-symbolic"
+        } else {
+            "go-down-symbolic"
+        };
+        actions = actions.push(key_button(
+            expand_icon,
+            "Process details",
+            self.accent(),
+            Message::ToggleExpandService(row_id.clone()),
+            KeyColor::Neutral,
+        ));
 
-        let mut content = widget::column::with_capacity(2)
-            .spacing(4.0)
-            .width(Length::Fill)
-            .push(title_row);
+        let pin_btn = Some(pin_circle_button(
+            Message::PinPort(p.clone()),
+            false,
+            self.accent(),
+        ));
 
-        if is_expanded {
+        let drawer = if is_expanded {
             let cmd = ports::process_cmdline(p.pid).unwrap_or_else(|| p.process.clone());
             let cwd = ports::process_cwd(p.pid).unwrap_or_default();
-            let mut info = widget::column::with_capacity(3)
-                .spacing(2.0)
+            let mut info_col = widget::column::with_capacity(3)
+                .spacing(spacing.space_xxxs)
                 .width(Length::Fill);
 
-            info = info.push(
+            info_col = info_col.push(
                 widget::row::with_capacity(2)
-                    .spacing(8.0)
-                    .push(widget::Text::new("BIND").size(10.0))
-                    .push(widget::Text::new(format!("{}:{}", p.host, p.port)).size(11.0)),
+                    .spacing(spacing.space_xxs)
+                    .push(faint_mono("BIND"))
+                    .push(dim_mono(format!("{}:{}", p.host, p.port))),
             );
             if !cwd.is_empty() {
-                info = info.push(
+                info_col = info_col.push(
                     widget::row::with_capacity(2)
-                        .spacing(8.0)
-                        .push(widget::Text::new("DIR").size(10.0))
-                        .push(widget::Text::new(cwd).size(11.0).width(Length::Fill)),
+                        .spacing(spacing.space_xxs)
+                        .push(faint_mono("DIR"))
+                        .push(widget::container(dim_mono(cwd)).width(Length::Fill).clip(true)),
                 );
             }
             if !cmd.is_empty() {
-                info = info.push(
+                info_col = info_col.push(
                     widget::row::with_capacity(2)
-                        .spacing(8.0)
-                        .push(widget::Text::new("CMD").size(10.0))
-                        .push(widget::Text::new(cmd).size(11.0).width(Length::Fill)),
+                        .spacing(spacing.space_xxs)
+                        .push(faint_mono("CMD"))
+                        .push(widget::container(dim_mono(cmd)).width(Length::Fill).clip(true)),
                 );
             }
-            content = content.push(info);
-        }
+            Some(
+                widget::container(info_col)
+                    .padding([4, 8])
+                    .class(drawer_class(industrial))
+                    .width(Length::Fill)
+                    .into(),
+            )
+        } else {
+            None
+        };
 
-        widget::container(content)
-            .padding([6, 8])
-            .width(Length::Fill)
-            .into()
+        card_shell(
+            LED_CYAN,
+            title,
+            badge,
+            pin_btn,
+            endpoint,
+            actions.into(),
+            drawer,
+            self.hover.as_deref() == Some(row_id.as_str()),
+            row_id,
+            industrial,
+        )
     }
 
-    fn render_discovered_group_row<'a>(
+    fn render_compact_discovered_group_row<'a>(
         &'a self,
         row_id: String,
         display_name: String,
@@ -1657,9 +2868,14 @@ impl AppModel {
         pids: Vec<i32>,
         first_port_opt: Option<ports::ListeningPort>,
     ) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+        let industrial = self.industrial();
         let is_expanded = self.expanded_service.as_deref() == Some(&row_id);
         let first_port = port_nums.first().copied().unwrap_or(0);
 
+        // Cap the hero line: full list lives in the drawer. This keeps
+        // multi-port groups (":35283 · :57621 +1") on one clipped line
+        // instead of overflowing into the action keys.
         const MAX_INLINE_PORTS: usize = 3;
         let shown: Vec<String> = port_nums
             .iter()
@@ -1677,122 +2893,174 @@ impl AppModel {
             format!("PID {}", pids.first().copied().unwrap_or(0))
         };
 
-        let mut actions = widget::row::with_capacity(4)
-            .spacing(4.0)
-            .align_y(cosmic::iced::Alignment::Center);
+        // Title row owns only the (clipped) name + tag. Ports + PID move to
+        // the full-width endpoint line below, so overlap is impossible.
+        let title = plain_title(display_name.clone(), industrial);
 
+        let badge_label = if let Some(fw) = &framework {
+            fw.clone()
+        } else if process_name != display_name {
+            process_name.clone()
+        } else {
+            String::new()
+        };
+        let badge: Element<'a, Message> = if badge_label.is_empty() {
+            widget::Space::new().width(Length::Shrink).into()
+        } else {
+            themed_badge(badge_label, industrial)
+        };
+
+        let endpoint = themed_endpoint(port_label, pid_spec, LED_CYAN, industrial);
+
+        let mut actions = widget::row::with_capacity(3).spacing(6.0);
         if first_port > 0 {
             let url = format!("http://localhost:{first_port}");
             actions = actions.push(tip(
-                widget::button::icon(icon::from_name("external-link-symbolic").size(14))
+                widget::button::custom(tinted_icon("external-link-symbolic", 13, COLOR_TEXT2))
+                    .padding(4)
+                    .class(cosmic::theme::Button::Custom {
+                        active: Box::new(|_, _| flat_btn_style(COLOR_TEXT2)),
+                        disabled: Box::new(|_| flat_btn_style(COLOR_SUBTLE)),
+                        hovered: Box::new(|_, _| flat_btn_style(LED_CYAN)),
+                        pressed: Box::new(|_, _| flat_btn_style(COLOR_TEXT2)),
+                    })
                     .on_press(Message::Open(url.clone())),
                 format!("Open {url}"),
             ));
         }
-        actions = actions.push(tip(
-            widget::button::icon(icon::from_name("media-playback-stop-symbolic").size(14))
-                .on_press(Message::KillProcessGroup(pids.clone())),
+
+        actions = actions.push(key_button(
+            "media-playback-stop-symbolic",
             "Stop process group",
+            self.accent(),
+            Message::KillProcessGroup(pids.clone()),
+            KeyColor::Danger,
         ));
-        let expand_icon = if is_expanded { "go-up-symbolic" } else { "go-down-symbolic" };
-        actions = actions.push(tip(
-            widget::button::icon(icon::from_name(expand_icon).size(14))
-                .on_press(Message::ToggleExpandService(row_id.clone())),
-            "Details",
+
+        let expand_icon = if is_expanded {
+            "go-up-symbolic"
+        } else {
+            "go-down-symbolic"
+        };
+        actions = actions.push(key_button(
+            expand_icon,
+            "Process group details",
+            self.accent(),
+            Message::ToggleExpandService(row_id.clone()),
+            KeyColor::Neutral,
         ));
-        if let Some(fp) = first_port_opt {
-            actions = actions.push(tip(
-                widget::button::icon(icon::from_name("view-pin-symbolic").size(14))
-                    .on_press(Message::PinPort(fp)),
-                "Pin as service",
-            ));
-        }
 
-        let mut title_left = widget::row::with_capacity(3)
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(6.0)
-            .push(
-                widget::Text::new(display_name.clone())
-                    .size(13.0)
-                    .font(cosmic::font::semibold()),
-            );
+        let pin_btn = first_port_opt.map(|fp| {
+            pin_circle_button(Message::PinPort(fp), false, self.accent())
+        });
 
-        if let Some(fw) = &framework {
-            title_left = title_left.push(
-                widget::button::text(format!("[{fw}]"))
-                    .class(cosmic::theme::Button::Text)
-                    .on_press(Message::FilterTo(process_name.clone())),
-            );
-        } else if process_name != display_name {
-            title_left = title_left.push(
-                widget::button::text(format!("[{process_name}]"))
-                    .class(cosmic::theme::Button::Text)
-                    .on_press(Message::FilterTo(process_name.clone())),
-            );
-        }
-
-        let title_row = widget::row::with_capacity(3)
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(8.0)
-            .width(Length::Fill)
-            .push(status_led(LED_CYAN))
-            .push(title_left)
-            .push(widget::Space::new().width(Length::Fill))
-            .push(actions);
-
-        let detail_row = widget::row::with_capacity(2)
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(8.0)
-            .width(Length::Fill)
-            .push(widget::Text::new(port_label).size(12.0).width(Length::Fill))
-            .push(widget::Text::new(pid_spec).size(11.0));
-
-        let mut content = widget::column::with_capacity(3)
-            .spacing(4.0)
-            .width(Length::Fill)
-            .push(title_row)
-            .push(detail_row);
-
-        if is_expanded {
-            let mut info = widget::column::with_capacity(3)
-                .spacing(2.0)
+        let drawer = if is_expanded {
+            let mut info_col = widget::column::with_capacity(4)
+                .spacing(spacing.space_xxxs)
                 .width(Length::Fill);
+            info_col = info_col.push(
+                widget::row::with_capacity(2)
+                    .spacing(spacing.space_xxs)
+                    .push(faint_mono("PORTS"))
+                    .push(dim_mono(
+                        port_nums
+                            .iter()
+                            .map(|p| p.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    )),
+            );
+            info_col = info_col.push(
+                widget::row::with_capacity(2)
+                    .spacing(spacing.space_xxs)
+                    .push(faint_mono("PIDS"))
+                    .push(dim_mono(
+                        pids.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", "),
+                    )),
+            );
+            Some(
+                widget::container(info_col)
+                    .padding([4, 8])
+                    .class(drawer_class(industrial))
+                    .width(Length::Fill)
+                    .into(),
+            )
+        } else {
+            None
+        };
 
-            info = info.push(
-                widget::row::with_capacity(2)
-                    .spacing(8.0)
-                    .push(widget::Text::new("PORTS").size(10.0))
-                    .push(
-                        widget::Text::new(
-                            port_nums
-                                .iter()
-                                .map(|p| p.to_string())
-                                .collect::<Vec<_>>()
-                                .join(", "),
-                        )
-                        .size(11.0),
-                    ),
-            );
-            info = info.push(
-                widget::row::with_capacity(2)
-                    .spacing(8.0)
-                    .push(widget::Text::new("PIDS").size(10.0))
-                    .push(
-                        widget::Text::new(
-                            pids.iter()
-                                .map(|p| p.to_string())
-                                .collect::<Vec<_>>()
-                                .join(", "),
-                        )
-                        .size(11.0),
-                    ),
-            );
-            content = content.push(info);
+        card_shell(
+            LED_CYAN,
+            title,
+            badge,
+            pin_btn,
+            endpoint,
+            actions.into(),
+            drawer,
+            self.hover.as_deref() == Some(row_id.as_str()),
+            row_id,
+            industrial,
+        )
+    }
+}
+
+fn opt_str(v: &str) -> Option<String> {
+    let t = v.trim();
+    if t.is_empty() {
+        None
+    } else {
+        Some(t.to_string())
+    }
+}
+
+/// An empty/whitespace services_json is valid (no data yet); anything else
+/// must parse as a JSON service list.
+fn parse_services(json: &str) -> Result<Vec<ServiceConfig>, serde_json::Error> {
+    if json.trim().is_empty() {
+        Ok(Vec::new())
+    } else {
+        serde_json::from_str(json)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_services_json_is_valid() {
+        assert!(parse_services("").unwrap().is_empty());
+        assert!(parse_services("  \n ").unwrap().is_empty());
+    }
+
+    #[test]
+    fn corrupt_services_json_is_err() {
+        assert!(parse_services("{not json").is_err());
+    }
+}
+
+impl AppModel {
+    /// True when the trimmed legacy industrial look is selected.
+    /// System (default) follows the COSMIC theme via `applet::style()`.
+    fn industrial(&self) -> bool {
+        self.config.use_industrial()
+    }
+
+    /// The active accent scheme, resolved from persisted config.
+    /// Only honoured in industrial mode; system mode uses the COSMIC accent.
+    fn accent(&self) -> Accent {
+        accent_from_name(self.config.accent_name())
+    }
+
+    /// Slang overrides for the colloquial nomenclature mode.
+    /// Dormant under the reference card layout; the "Pimp my port" toggle
+    /// in settings is retained so the mode can return without rework.
+    #[allow(dead_code)]
+    fn lingo(&self, straight: impl Into<String>, slang: &str) -> String {
+        if self.config.colloquial {
+            slang.to_string()
+        } else {
+            straight.into()
         }
-
-        widget::container(content)
-            .padding([6, 8])
-            .width(Length::Fill)
-            .into()
     }
 }

@@ -1,5 +1,152 @@
-- **2026-10-08 12:12** [clarification] Clarified multi-version confusion: lazy-ports = sole upload target, -legacy = backup of old code, -new = nonexistent wrong path; panel runs stale Oct 3 installed binary not the Oct 6 build
-- **2026-10-08 13:33** [clarification] Clarified install semantics: terminal dev-install (just install) is agent's job, app-store install is for end users after Flathub publish; gave user panel-verification checklist
-- **2026-10-12 15:25** [initialization] Hydrated context and ran session start checklist
-- **2026-10-12 16:09** [ui] Redesigned UI conforming to COSMIC applet template: list_column cards, removed jarring stop button styling, scrollable popup, clean section headers
-- **2026-10-12 21:04** [ui] Restored custom layout, app label, and theme adherence with proper padding
+- **2026-09-16 12:08** [feature] Added crash notifications (notify-send) and refresh modes (Balanced/Low Resource/Realtime) to loPee applet
+- **2026-09-16 13:34** [task] Starting bug-fix implementation per audit docs/audit-2026-09-16.md
+- **2026-09-16 13:41** [fix] Implemented all 9 audit fixes in src/services.rs, src/app.rs, src/ports.rs
+- **2026-09-16 14:01** [review] Code-quality review of 9-fix batch (services/app/ports): build clean, clippy 0 warnings, no critical issues; 0 important, 6 minors documented
+- **2026-09-16 16:49** [feature] Generated crane icon assets (app icon + symbolic panel glyph), wired applet button, installed and live-spawned in panel; committed
+- **2026-09-16 17:54** [planning] Wrote spec 20260916T175240-polling-races-health-fixes.md + ADRs 0001-0003 (popup-gated polling, per-id lifecycle serialization, scheme-driven health modes) for the 3 pending fixes
+- **2026-09-16 18:09** [implementation] Implemented spec 20260916T175240: popup-gated polling, per-id lifecycle serialization + ghost-Running fix, scheme-driven health modes
+- **2026-09-16 18:20** [review] Code-quality review of 3-fix batch (op_lock/subscription re-key/ghost fix/tcp_probe/health_mode)
+- **2026-09-16 18:27** [feature] Landed spec 20260916T175240 via subagent workflow: popup-gated polling (re-keyed tick), per-id lifecycle serialization (op_lock + is_managed gates on both Start and Restart result arms), scheme-driven health modes; ADRs 0001-0003 Accepted; spec archived to spec-history; 11 tests, clippy 0; deployed, idle polling verified 0 vs ~10+ ungated
+- **2026-09-16 20:43** [feature] Compact footer (icon add button), removed vibes credits from popup (kept in README), added persisted hide-system-processes toggle filtering non-owner-uid ports; deployed
+- **2026-09-16 20:55** [feature] Switched popup scrollbars to Minimal overlay style (no permanent scrollbar rail); deployed
+- **2026-09-16 21:32** [git] Pushed loPee/Lazy Ports to github.com/GYCinc/loPee (private); metainfo URLs fixed to real repo; full history on origin/main
+- **2026-09-23 04:40** [exploration] Hydrating into loPee codebase
+- **2026-09-23 19:54** [exploration] Completed thorough codebase hydration
+- **2026-09-23 19:55** [ui] Investigating UI display and grouping issue
+- **2026-09-24 11:38** [checkpoint] Checkpointing current state before UI presentation refactor
+- **2026-09-24 11:40** [branding] Renaming project to Lazy Ports and preparing presentation plan
+- **2026-09-24 14:35** [ui] Starting implementation of unified presentation and smart port grouping
+- **2026-09-24 14:35** [ui] Implementing on-demand port discovery feature and smart grouping
+- **2026-09-24 14:36** [research] Analyzing port reservation and locking mechanisms
+- **2026-09-24 14:37** [ui/ux] Designing progressive disclosure UX and port reservation architecture
+- **2026-09-24 15:35** [implementation] Beginning execution of progressive disclosure UI and port reservation
+- **2026-09-24 15:47** [feature] Completed progressive disclosure UI refactor, port reservation, and smart grouping
+- **2026-09-24 18:15** [deployment] Deploying newly built Lazy Ports binary to ~/.local/bin/lopee
+- **2026-09-24 18:17** [deployment] Live deployed and reloaded Lazy Ports in COSMIC panel
+- **2026-09-24 18:19** [research] Inspecting src/app.rs to check active vs inactive services rendering
+- **2026-09-24 18:22** [implementation] Starting progressive disclosure implementation: separating active and inactive services and filtering loPee reserved ports
+- **2026-09-24 18:34** [deployment] Installing updated lopee binary to ~/.local/bin/lopee and restarting cosmic-panel
+- **2026-09-24 20:49** [completion] Completed active vs inactive progressive disclosure layout and reserved port mislabeling fix. Deployed and verified on live panel.
+- **2026-09-24 21:27** [research] Investigating UI issues: 'refresh balance' duplication, redundancy in active services count, and broken layout in service action drawer
+- **2026-09-24 21:54** [design] Fetching design from Stitch project 7683329988478722916
+- **2026-09-24 21:58** [implementation] Implementing Stitch industrial precision UI design language in loPee applet
+- **2026-09-24 22:01** [deployment] Deploying Stitch-aligned industrial layout build to ~/.local/bin/lopee and restarting cosmic-panel
+- **2026-09-24 22:02** [completion] Completed Stitch industrial precision UI design implementation. Deployed and verified on live panel.
+- **2026-09-24 22:18** [research] Analyzing Stitch UI screenshot and planning custom card layout without settings::item constraints
+- **2026-09-24 23:49** [audit] Inspecting current UI and planning Stitch design implementation
+- **2026-09-25 03:52** [plan] Created detailed implementation plan for Stitch industrial design and typography overhaul
+- **2026-09-25 05:49** [implementation] Starting implementation: Stitch industrial design overhaul - replacing settings::item with custom Container::Card layout
+- **2026-09-25 06:39** [implementation] Completed Stitch industrial design overhaul: render_service_card, render_discovered_group_card, render_discovered_port_card with status LEDs, calibration sub-header, no emoji, single-line endpoint row. 13/13 tests passing, release building.
+- **2026-09-25 06:39** [deploy] Deployed release binary to /home/hayron/.local/bin/lopee and restarted cosmic-panel
+- **2026-09-25 15:52** [deploy] Redeploying Lazy Ports with spec-faithful Industrial Precision typography
+- **2026-09-25 15:52** [deploy] Redeploying Lazy Ports with spec-faithful Industrial Precision typography
+- **2026-09-25 16:26** [feature] Reworked popup to match owner's uploaded LocalPorts reference: icon+title header, Profile row, Services label, cards with name/URL-status/four round buttons (open, copy, stop, expand), Refresh + Quit footer
+- **2026-09-25 16:26** [feature] Reworked popup to match the uploaded LocalPorts reference: icon+title header, Profile row, Services label, cards with name / URL-status / four round buttons (open, copy, stop, expand), Refresh + Quit footer
+- **2026-09-25 17:42** [feature] Rebuilt popup to the Industrial Precision spec: 476px chassis, filter header, calibration rail, hero port, hover lift, glow LEDs, packed footer
+- **2026-09-25 18:08** [bugfix] Diagnosed and fixed the floating/no-border frame: applied the real spec palette, added the #14161b chassis with hairline edge + 12px gutters, non-wrapping endpoint line, keycap search field, glyph buttons
+- **2026-09-25 20:34** [bugfix] Removed the decorative Cmd-K chip from the search plate: the applet has no keyboard handling, so the advertised shortcut was a dead affordance
+- **2026-09-25 20:50** [feature] Bundled Caveat Brush (SIL OFL) as a black-Sharpie wordmark, deleted the calibration rail, dropped the V0.1.0 CORE line, replaced the LP initials tile with a real socket icon, clipped the chassis so the footer stops being sliced
+- **2026-09-25 20:59** [feature] Added user-selectable accent colours, a real poll-rate popover, a breathing poll LED, edge-spread card layout, and heavier footer keys
+- **2026-09-25 22:36** [bugfix] Fixed the port/pid baseline misalignment and out-of-order telemetry; replaced the invented socket glyph with the real installed Lazy Ports mark
+- **2026-09-25 22:42** [bugfix] Replaced the glitching poll popover with an inline animated rate list; authored the missing scalable app icon from the shipped raster art
+- **2026-09-25 23:35** [feature] Rebuilt the scalable app icon from the owner's blueprint art, so each container carries the RJ45 jack that makes the pun legible
+- **2026-09-26 12:50** [general] --help
+- **2026-09-26 13:01** [planning] Recovered crashed Lazy Ports WIP session from opencode brain
+- **2026-09-26 13:33** [feature] Restructured cards to shared card_shell: two-row layout (title row + full-width endpoint), overlap structurally impossible; flat keys, bare badges, lifted secondary text, ringed magnifier search
+- **2026-09-29 12:02** [initialization] Hydrating context on COSMIC applet project loPee
+- **2026-09-29 12:09** [ui] Analyzing screenshot and feedback on UI layout and typography
+- **2026-09-29 12:16** [deploy] Deploying binary via install and restarting panel
+- **2026-09-29 13:17** [troubleshooting] Investigating missing panel applet process
+- **2026-10-01 16:08** [discovery] Investigating LazyPorts applet location
+- **2026-10-01 16:09** [discovery] Examining Cargo.toml and README
+- **2026-10-01 16:10** [discovery] Checking for other lopee / lazyports installations
+- **2026-10-01 16:11** [investigation] Inspecting wayshot.png and checking UI files
+- **2026-10-01 16:11** [investigation] Inspecting src directory
+- **2026-10-01 16:11** [investigation] Searching strings in src
+- **2026-10-01 16:11** [investigation] Searching for Inactive and Discovered in project
+- **2026-10-01 16:11** [investigation] Searching service_card in app.rs
+- **2026-10-01 16:11** [investigation] Locating card_shell implementation
+- **2026-10-01 16:11** [investigation] Searching row_title definition in app.rs
+- **2026-10-01 16:11** [investigation] Searching tip definition
+- **2026-10-01 16:11** [investigation] Searching design references in project
+- **2026-10-01 16:11** [investigation] Checking git log
+- **2026-10-01 16:11** [investigation] Viewing recent commit diffs
+- **2026-10-01 16:11** [investigation] Viewing git diff for 4378ddc in app.rs
+- **2026-10-01 16:12** [investigation] Viewing git diff for card_shell and header in 4378ddc
+- **2026-10-01 16:12** [investigation] Checking previous card designs in git log
+- **2026-10-01 16:12** [investigation] Checking diff of render_service_card in 4378ddc
+- **2026-10-01 16:12** [investigation] Checking full git diff for 4378ddc
+- **2026-10-01 16:12** [investigation] Inspecting discovered cards in app.rs
+- **2026-10-01 16:12** [investigation] Checking i18n directory
+- **2026-10-01 16:13** [investigation] Checking usage of CopyUrl in codebase
+- **2026-10-01 16:13** [investigation] Checking all occurrences of inactive-services and discovered-ports
+- **2026-10-01 16:13** [investigation] Running cargo check
+- **2026-10-01 16:13** [test] Validating build and running tests
+- **2026-10-01 16:13** [investigation] Checking Message::CopyUrl definition
+- **2026-10-01 16:14** [test] Running cargo test after removing CopyUrl
+- **2026-10-01 16:14** [review] Reviewing git diff of applied UI tweaks
+- **2026-10-01 16:14** [review] Checking git status
+- **2026-10-01 16:15** [build] Compiling debug build
+- **2026-10-01 16:16** [discovery] Checking running lopee process
+- **2026-10-01 16:16** [discovery] Checking ~/.local/bin/lopee details
+- **2026-10-01 16:16** [build] Building release binary
+- **2026-10-01 16:16** [discovery] Checking lopee parent process
+- **2026-10-01 16:16** [discovery] Checking PID 221877
+- **2026-10-01 16:16** [install] Installing updated lopee binary to ~/.local/bin
+- **2026-10-01 16:16** [install] Installing binary with install command
+- **2026-10-01 16:16** [install] Installing binary with install command
+- **2026-10-01 16:17** [process] Restarting lopee applet process
+- **2026-10-01 16:17** [discovery] Checking lopee process status
+- **2026-10-01 16:17** [process] Launching updated lopee applet
+- **2026-10-01 18:16** [investigation] Checking lopee process and logs
+- **2026-10-01 18:16** [debug] Testing lopee launch to capture output
+- **2026-10-01 18:17** [discovery] Checking cosmic-panel environment
+- **2026-10-01 18:17** [discovery] Checking cosmic-panel applet configuration
+- **2026-10-01 18:17** [discovery] Checking plugins in CosmicPanel.Panel
+- **2026-10-01 18:17** [discovery] Checking desktop file contents
+- **2026-10-01 18:41** [discovery] Checking cosmic-panel systemd unit
+- **2026-10-01 18:41** [discovery] Checking cosmic-panel process
+- **2026-10-01 18:41** [discovery] Checking PID 4747
+- **2026-10-01 18:41** [desktop] Restarting cosmic-panel
+- **2026-10-01 18:41** [status] Checking lopee PID 939858
+- **2026-10-01 21:55** [discovery] Checking for recent screenshots or files
+- **2026-10-01 21:55** [investigation] Checking endpoint_line implementation
+- **2026-10-01 21:57** [build] Building and installing updated lopee binary
+- **2026-10-01 21:58** [build] Building and installing lopee release binary
+- **2026-10-01 21:58** [status] Verifying lopee process
+- **2026-10-01 22:04** [discovery] Checking current listening processes cmdline and cwd
+- **2026-10-01 22:08** [build] Running cargo test and release build
+- **2026-10-01 22:09** [test] Running cargo test
+- **2026-10-01 22:09** [release] Building release binary and reloading cosmic-panel
+- **2026-10-01 22:10** [status] Verifying updated lopee process running
+- **2026-10-02 01:03** [release] Building release and updating section labels
+- **2026-10-02 01:04** [status] Checking lopee process
+- **2026-10-02 01:06** [investigation] Checking LED_CYAN in app.rs
+- **2026-10-02 01:07** [investigation] Searching Delete messages in app.rs
+- **2026-10-02 01:07** [investigation] Searching key_button calls in app.rs
+- **2026-10-02 01:09** [build] Testing and compiling release build
+- **2026-10-02 01:09** [build] Running cargo test and release build
+- **2026-10-02 01:09** [investigation] Checking settings view in app.rs
+- **2026-10-02 01:11** [ui] Refining Preferences and Secondary Views to Industrial Precision standard
+- **2026-10-02 01:11** [test] Compiling and testing new chassis and preferences UI
+- **2026-10-02 01:11** [deploy] Installing release build and reloading cosmic-panel
+- **2026-10-02 01:15** [ui] Updating port and LED colors for active (green), inactive (purple), listening (cyan), and fixing button icon tinting
+- **2026-10-02 01:16** [test] Running cargo test on color updates
+- **2026-10-02 01:16** [deploy] Deploying release with green active, purple inactive, cyan listening, red stop, blue globe, green start
+- **2026-10-02 01:23** [refactor] Renaming project, binary, app ID, icons, and folder to lazy-ports
+- **2026-10-02 01:26** [refactor] Renamed folder and all resources to lazy-ports with tetradic palette applied
+- **2026-10-02 01:31** [ui] Making service titles clickable links to open in browser and removing globe button
+- **2026-10-02 01:32** [deploy] Installing updated release binary with clickable title links and clean button row
+- **2026-10-02 11:05** [audit] Inspected lazy-ports repo status and validated build/tests for shipping readiness
+- **2026-10-02 11:18** [ui] Refactoring card layout, drawer actions, pin position, reordering controls, and high-density inactive/discovered lists
+- **2026-10-02 11:20** [feature] Implemented clean pin position, service reordering, refined drawer, and high-density inactive/discovered lists
+- **2026-10-02 13:18** [cleanup] Cleaned up old metadata, deprecated lopee assets and verified translation loading
+- **2026-10-02 15:56** [deploy] Building and deploying updated Lazy Ports release binary to ~/.local/bin/lazy-ports
+- **2026-10-02 17:54** [deploy] Reloaded cosmic-panel with newly compiled Lazy Ports binary (PID 1222576)
+- **2026-10-02 17:57** [feature] Updated registered service indicators: Green for Active, Yellow/Amber for Failed/Crashed
+- **2026-10-02 17:57** [deploy] Deployed updated indicator logic: Active services show Green, Failed/Crashed services show Yellow/Amber
+- **2026-10-02 18:14** [ui] Refined pin button styling and corner positioning to match reference image
+- **2026-10-03 13:05** [UI] Refining pin button styling and top-right corner placement in service cards
+- **2026-10-03 13:06** [UI] Verified deployment of lazy-ports release build into cosmic-panel
+- **2026-10-07 00:44** [install] Installed fresh release build via manual just-install recipe steps (just binary not present on system)
+- **2026-10-13 07:39** [ui] Unified all port cards and rows onto card_shell with consistent title typography, pin buttons, and fixed header

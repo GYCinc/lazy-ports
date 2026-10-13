@@ -1,19 +1,25 @@
+# Name of the application's binary.
 name := 'lazy-ports'
+# The unique ID of the application.
 appid := 'io.github.hayron.lazy-ports'
-
+# Path to root file system, which defaults to `/`.
 rootdir := ''
+# The prefix for the `/usr` directory.
 prefix := '/usr'
+# The location of the cargo target directory.
+cargo-target-dir := env('CARGO_TARGET_DIR', 'target')
 
+# Application's appstream metadata
 appdata := appid + '.metainfo.xml'
+# Application's desktop entry
 desktop := appid + '.desktop'
 
-# Installation paths
+# Install destinations
 base-dir := absolute_path(clean(rootdir / prefix))
-cargo-target-dir := env('CARGO_TARGET_DIR', 'target')
 appdata-dst := base-dir / 'share' / 'appdata' / appdata
 bin-dst := base-dir / 'bin' / name
 desktop-dst := base-dir / 'share' / 'applications' / desktop
-icon-dst := base-dir / 'share' / 'icons' / 'hicolor' / 'scalable' / 'apps' / appid + '.svg'
+icons-dst := base-dir / 'share' / 'icons' / 'hicolor'
 
 # Default recipe which runs `just build-release`
 default: build-release
@@ -31,7 +37,7 @@ clean-dist: clean clean-vendor
 
 # Compiles with debug profile
 build-debug *args:
-    cargo build {{args}}
+    cargo build --locked {{args}}
 
 # Compiles with release profile
 build-release *args: (build-debug '--release' args)
@@ -41,33 +47,35 @@ build-vendored *args: vendor-extract (build-release '--frozen --offline' args)
 
 # Runs a clippy check
 check *args:
-    cargo clippy --all-features {{args}} -- -W clippy::pedantic
+    cargo clippy --all-features --locked {{args}} -- -W clippy::pedantic
 
 # Runs a clippy check with JSON message format
 check-json: (check '--message-format=json')
 
 # Run the application for testing purposes
 run *args:
-    env RUST_BACKTRACE=full cargo run --release {{args}}
+    env RUST_BACKTRACE=full cargo run --release --locked {{args}}
 
 # Installs files
 install:
     install -Dm0755 {{ cargo-target-dir / 'release' / name }} {{bin-dst}}
     install -Dm0644 {{ 'target' / 'xdgen' / 'app.desktop' }} {{desktop-dst}}
     install -Dm0644 {{ 'target' / 'xdgen' / 'app.metainfo.xml' }} {{appdata-dst}}
-    install -Dm0644 resources/icon.svg {{icon-dst}}
+    install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / '256x256' / 'apps' / (appid + '.png') }} {{icons-dst / '256x256' / 'apps' / (appid + '.png')}}
+    install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / '128x128' / 'apps' / (appid + '.png') }} {{icons-dst / '128x128' / 'apps' / (appid + '.png')}}
+    install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / (appid + '-symbolic.svg') }} {{icons-dst / 'scalable' / 'apps' / (appid + '-symbolic.svg')}}
 
 # Uninstalls installed files
 uninstall:
-    rm {{bin-dst}} {{desktop-dst}} {{icon-dst}}
+    rm {{bin-dst}} {{desktop-dst}} {{icons-dst / '256x256' / 'apps' / (appid + '.png')}} {{icons-dst / '128x128' / 'apps' / (appid + '.png')}} {{icons-dst / 'scalable' / 'apps' / (appid + '-symbolic.svg')}}
 
 # Vendor dependencies locally
 vendor:
     mkdir -p .cargo
-    cargo vendor --sync Cargo.toml | head -n -1 > .cargo/config.toml
+    cargo vendor | head -n -1 > .cargo/config.toml
     echo 'directory = "vendor"' >> .cargo/config.toml
-    echo >> .cargo/config.toml
-    rm -rf .cargo vendor
+    tar pcf vendor.tar vendor
+    rm -rf vendor
 
 # Extracts vendored dependencies
 vendor-extract:
@@ -81,5 +89,5 @@ tag version:
     cargo clean
     git add Cargo.lock
     git commit -m 'release: {{version}}'
+    git commit --amend
     git tag -a {{version}} -m ''
-
