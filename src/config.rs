@@ -48,14 +48,10 @@ impl Config {
     }
 
     /// True when the industrial look is selected or by default.
-    /// Returns false only when explicitly set to "system".
+    /// True when the legacy industrial look is explicitly selected.
+    /// System is the default: an empty or "system" value follows COSMIC.
     pub fn use_industrial(&self) -> bool {
-        let mode = self.theme_mode.trim();
-        if mode.is_empty() {
-            true
-        } else {
-            !mode.eq_ignore_ascii_case("system")
-        }
+        self.theme_mode.trim().eq_ignore_ascii_case("industrial")
     }
 }
 
