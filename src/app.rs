@@ -2090,24 +2090,22 @@ impl cosmic::Application for AppModel {
                 return Task::perform(services::stop_managed(id), |_| action(Message::Tick));
             }
             Message::MoveServiceUp(id) => {
-                if let Some(pos) = self.services.iter().position(|s| s.id == id) {
-                    if pos > 0 {
+                if let Some(pos) = self.services.iter().position(|s| s.id == id)
+                    && pos > 0 {
                         self.services.swap(pos, pos - 1);
                         if let Err(err) = self.persist_services() {
                             self.error = Some(err);
                         }
                     }
-                }
             }
             Message::MoveServiceDown(id) => {
-                if let Some(pos) = self.services.iter().position(|s| s.id == id) {
-                    if pos + 1 < self.services.len() {
+                if let Some(pos) = self.services.iter().position(|s| s.id == id)
+                    && pos + 1 < self.services.len() {
                         self.services.swap(pos, pos + 1);
                         if let Err(err) = self.persist_services() {
                             self.error = Some(err);
                         }
                     }
-                }
             }
             Message::ResetCorruptConfig => {
                 self.services_corrupt = false;
@@ -2349,6 +2347,12 @@ impl AppModel {
             }
         }
         if !is_reserved && let Some(lp) = self.matching_port(cfg, ports) {
+            if cfg.reserved {
+                return (
+                    SvcState::Collision(format!("port {} taken", lp.port)),
+                    Some(lp),
+                );
+            }
             return (SvcState::Running, Some(lp));
         }
         if let Some(state) = self.states.get(&cfg.id)
@@ -2518,7 +2522,7 @@ impl AppModel {
         // Status LED and port color: Green for Active, Yellow/Amber for Failed/Crashed
         let (led_color, port_color) = match &state {
             SvcState::Running | SvcState::Starting => (LED_GREEN, LED_GREEN),
-            SvcState::Failed(_) => (LED_AMBER, LED_AMBER),
+            SvcState::Failed(_) | SvcState::Collision(_) => (LED_AMBER, LED_AMBER),
             SvcState::Stopped => {
                 if is_reserved {
                     (LED_CYAN, LED_CYAN)
@@ -2556,7 +2560,7 @@ impl AppModel {
                     self.lingo("STOPPED".to_string(), "SLEEPIN'")
                 }
             }
-            SvcState::Failed(e) => {
+            SvcState::Failed(e) | SvcState::Collision(e) => {
                 let short: String = e.chars().take(8).collect();
                 let dots = if e.chars().count() > 8 { "…" } else { "" };
                 self.lingo(format!("BROKE: {short}{dots}"), &format!("COOKED: {short}{dots}"))
@@ -2650,7 +2654,7 @@ impl AppModel {
         let port_num = cfg.host_port().map(|(_, p)| p).unwrap_or(0);
         let is_reserved = cfg.reserved && services::is_port_reserved(port_num);
         let led_color = match &state {
-            SvcState::Failed(_) => LED_AMBER,
+            SvcState::Failed(_) | SvcState::Collision(_) => LED_AMBER,
             SvcState::Running | SvcState::Starting => LED_GREEN,
             SvcState::Stopped => {
                 if is_reserved {

@@ -104,15 +104,12 @@ pub fn inspect_process_meta(pid: i32, process_name: &str) -> (Option<String>, Op
         if !is_generic {
             // Check package.json
             let pkg_json = path.join("package.json");
-            if let Ok(content) = std::fs::read_to_string(&pkg_json) {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(name) = val.get("name").and_then(|v| v.as_str()) {
-                        if !name.is_empty() {
+            if let Ok(content) = std::fs::read_to_string(&pkg_json)
+                && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
+                    && let Some(name) = val.get("name").and_then(|v| v.as_str())
+                        && !name.is_empty() {
                             project_name = Some(name.to_string());
                         }
-                    }
-                }
-            }
 
             // Check Cargo.toml
             if project_name.is_none() {
@@ -120,15 +117,14 @@ pub fn inspect_process_meta(pid: i32, process_name: &str) -> (Option<String>, Op
                 if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
                     for line in content.lines() {
                         let trimmed = line.trim();
-                        if trimmed.starts_with("name") && trimmed.contains('=') {
-                            if let Some(n) = trimmed.split('=').nth(1) {
+                        if trimmed.starts_with("name") && trimmed.contains('=')
+                            && let Some(n) = trimmed.split('=').nth(1) {
                                 let cleaned = n.trim().trim_matches('"').trim_matches('\'').trim();
                                 if !cleaned.is_empty() {
                                     project_name = Some(cleaned.to_string());
                                     break;
                                 }
                             }
-                        }
                     }
                 }
             }
@@ -139,27 +135,24 @@ pub fn inspect_process_meta(pid: i32, process_name: &str) -> (Option<String>, Op
                 if let Ok(content) = std::fs::read_to_string(&pyproject) {
                     for line in content.lines() {
                         let trimmed = line.trim();
-                        if (trimmed.starts_with("name") || trimmed.starts_with("project.name")) && trimmed.contains('=') {
-                            if let Some(n) = trimmed.split('=').nth(1) {
+                        if (trimmed.starts_with("name") || trimmed.starts_with("project.name")) && trimmed.contains('=')
+                            && let Some(n) = trimmed.split('=').nth(1) {
                                 let cleaned = n.trim().trim_matches('"').trim_matches('\'').trim();
                                 if !cleaned.is_empty() {
                                     project_name = Some(cleaned.to_string());
                                     break;
                                 }
                             }
-                        }
                     }
                 }
             }
 
             // Fallback: directory folder name
-            if project_name.is_none() {
-                if let Some(dir_name) = path.file_name().and_then(|s| s.to_str()) {
-                    if !dir_name.is_empty() && dir_name != "home" {
+            if project_name.is_none()
+                && let Some(dir_name) = path.file_name().and_then(|s| s.to_str())
+                    && !dir_name.is_empty() && dir_name != "home" {
                         project_name = Some(dir_name.to_string());
                     }
-                }
-            }
         }
     }
 
