@@ -2864,6 +2864,7 @@ impl AppModel {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_compact_discovered_group_row<'a>(
         &'a self,
         row_id: String,

@@ -150,3 +150,4 @@
 - **2026-10-03 13:06** [UI] Verified deployment of lazy-ports release build into cosmic-panel
 - **2026-10-07 00:44** [install] Installed fresh release build via manual just-install recipe steps (just binary not present on system)
 - **2026-10-13 07:39** [ui] Unified all port cards and rows onto card_shell with consistent title typography, pin buttons, and fixed header
+- **2026-10-18 07:52** [git] commit leftover clippy allow attribute
