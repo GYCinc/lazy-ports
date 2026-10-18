@@ -944,6 +944,7 @@ enum SvcState {
     Starting,
     Running,
     Failed(String),
+    Collision(String),
 }
 
 #[derive(Debug, Clone)]
@@ -1537,10 +1538,12 @@ impl cosmic::Application for AppModel {
             )
             .push(filter_field);
 
-        let header = widget::row::with_capacity(3)
+        let header = widget::row::with_capacity(4)
             .align_y(cosmic::iced::Alignment::Center)
             .spacing(spacing.space_xs)
             .width(Length::Fill)
+            .push(search_plate)
+            .push(widget::Space::new().width(Length::Fill))
             .push(
                 widget::Text::new(fl!("app-title"))
                     .size(15.0)
@@ -1551,7 +1554,6 @@ impl cosmic::Application for AppModel {
                         cosmic::theme::Text::Default
                     }),
             )
-            .push(widget::container(search_plate).width(Length::Fill))
             .push(flat_key_button(
                 "emblem-system-symbolic",
                 "Lazy Ports settings",

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Lazy Ports — scalable app icon.
+
+  Authored from the owner's blueprint source art: a tower crane lifting shipping
+  containers, each stamped with an RJ45 network jack — "ports" in both senses.
+
+  Tuned for small sizes: the container stack (which carries the pun) is large
+  and high-contrast, while the crane is deliberately reduced to a few bold
+  strokes so it does not turn into lattice noise below 32px.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17242f"/>
+      <stop offset="1" stop-color="#0c141c"/>
+    </linearGradient>
+
+    <!-- An RJ45 jack: keyed bezel, dark throat, three gold contacts.
+         Few and thick so the contacts survive being scaled to 16px. -->
+    <g id="rj45">
+      <path d="M6 0h24a6 6 0 0 1 6 6v11h-8l-3 5H11L8 17H0V6a6 6 0 0 1 6-6z" fill="#c6d2de"/>
+      <path d="M7.5 3.5h21A2.5 2.5 0 0 1 31 6v7H5V6a2.5 2.5 0 0 1 2.5-2.5z" fill="#070b0f"/>
+      <g stroke="#ffd27a" stroke-width="3.2" stroke-linecap="round">
+        <path d="M10 12l2.5-5.5M17 12l2.5-5.5M24 12l2.5-5.5"/>
+      </g>
+    </g>
+
+    <!-- Container shell: body, top highlight, five ribs. -->
+    <g id="shell">
+      <rect x="0" y="0" width="80" height="25" rx="3" fill="currentColor"/>
+      <rect x="0" y="0" width="80" height="5" rx="2.5" fill="#ffffff" opacity=".2"/>
+      <rect x="0" y="21" width="80" height="4" rx="2" fill="#000000" opacity=".3"/>
+      <g stroke="#000000" stroke-width="2" opacity=".24">
+        <path d="M7 6v14M14 6v14M66 6v14M73 6v14"/>
+      </g>
+    </g>
+  </defs>
+
+  <!-- blueprint backdrop -->
+  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+  <g stroke="#20313f" stroke-width="1" opacity=".7">
+    <path d="M0 32h128M0 64h128M0 96h128M32 0v128M64 0v128M96 0v128"/>
+  </g>
+
+  <!-- ================= tower crane (deliberately coarse) ================= -->
+  <!-- mast: two chords, four ties, three diagonals -->
+  <g fill="none" stroke="#8a99a7" stroke-width="4" stroke-linecap="round">
+    <path d="M9 110V34M27 110V34"/>
+  </g>
+  <g stroke="#7b8a98" stroke-width="2.6" fill="none" stroke-linecap="round">
+    <path d="M9 46h18M9 66h18M9 86h18M9 104h18"/>
+  </g>
+  <g stroke="#5f6d7a" stroke-width="2" fill="none" stroke-linecap="round">
+    <path d="M9 46l18 20M27 46L9 66M9 86l18 18"/>
+  </g>
+
+  <!-- machinery house -->
+  <rect x="5" y="22" width="26" height="13" rx="3" fill="#93a1af"/>
+  <rect x="5" y="22" width="26" height="3.5" rx="1.75" fill="#bcc8d4"/>
+  <rect x="10" y="27" width="7" height="6" rx="1.5" fill="#28323c"/>
+
+  <!-- jib reaching right over the stacks -->
+  <g stroke="#93a1af" stroke-width="4" fill="none" stroke-linecap="round">
+    <path d="M16 33h100"/>
+    <path d="M22 48h94"/>
+  </g>
+  <g stroke="#697787" stroke-width="2.4" fill="none" stroke-linecap="round">
+    <path d="M30 34l6 14M50 34l6 14M70 34l6 14M90 34l6 14M108 36l5 12"/>
+  </g>
+  <!-- counterweight -->
+  <rect x="0" y="35" width="16" height="11" rx="2" fill="#7b8a98"/>
+
+  <!-- trolley, hook, slings -->
+  <rect x="70" y="32" width="15" height="10" rx="2" fill="#aab6c2"/>
+  <circle cx="77" cy="50" r="5" fill="#aab6c2"/>
+  <circle cx="77" cy="50" r="2" fill="#28323c"/>
+  <g stroke="#c3ccd4" stroke-width="1.8" fill="none" opacity=".95">
+    <path d="M77 55L42 60M77 55l35 5M77 55L60 60M77 55l-2 5"/>
+  </g>
+
+  <!-- ================= containers, each stamped with a port ================= -->
+  <g transform="translate(38 60)" color="#bd5f39">
+    <use href="#shell"/>
+    <g transform="translate(22 2)"><use href="#rj45"/></g>
+  </g>
+  <g transform="translate(38 88)" color="#859263">
+    <use href="#shell"/>
+    <g transform="translate(22 2)"><use href="#rj45"/></g>
+  </g>
+
+  <!-- quay -->
+  <rect x="2" y="114" width="124" height="9" rx="2.5" fill="#3d4956"/>
+  <rect x="2" y="114" width="124" height="2.5" rx="1.25" fill="#5a6875"/>
+</svg>
