@@ -1,10 +1,10 @@
 [package]
 name = "lazy-ports"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "Manage local dev services and ports from the COSMIC panel"
-repository = "https://github.com/hayron/lazy-ports"
+repository = "https://github.com/GYCinc/lazy-ports"
 
 [dependencies]
 i18n-embed = { version = "0.16", features = [

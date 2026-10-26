@@ -13,14 +13,17 @@
       logs, and stop or kill processes — all from the panel.
     </p>
     <p>
-      It follows the system COSMIC theme by default, with an optional
-      legacy industrial dark look available in Preferences.
+      Lazy Ports ships with its own dark instrument skin by default, with
+      an optional System theme available in Preferences. The Listening
+      Ports rail starts collapsed, action glyphs stay legible at rest, and
+      long service names are truncated cleanly instead of overlapping the
+      action buttons.
     </p>
   </description>
   <icon type="remote" width="64" height="64" scale="1">
-    https://github.com/hayron/lazy-ports/raw/main/resources/icons/hicolor/scalable/apps/io.github.hayron.lazy-ports-symbolic.svg
+    https://github.com/GYCinc/lazy-ports/raw/main/resources/icons/hicolor/scalable/apps/io.github.hayron.lazy-ports-symbolic.svg
   </icon>
-  <url type="vcs-browser">https://github.com/hayron/lazy-ports</url>
+  <url type="vcs-browser">https://github.com/GYCinc/lazy-ports</url>
   <launchable type="desktop-id">io.github.hayron.lazy-ports.desktop</launchable>
   <provides>
     <id>com.system76.CosmicPanelApplet</id>
@@ -44,6 +47,11 @@
   </keywords>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.0" date="2026-10-26">
+      <description>
+        <p>Skin-first default: the applet ships with its own dark instrument skin and an optional System theme in Preferences. Listening Ports rail starts collapsed. Action glyphs are legible at rest. Long service names ellipsise instead of overlapping action buttons. Preferences rows keep a readable label column.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-07">
       <description>
         <p>System COSMIC theme by default with optional industrial look; multi-port group rows fixed.</p>

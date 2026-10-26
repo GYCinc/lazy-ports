@@ -17,6 +17,8 @@ macOS menu bar app.
   200–399 counts as healthy, 1.5 s timeout.
 - **Persistence** — service list is stored via cosmic-config
   (`services_json` key), survives restarts.
+- **Theme** — ships with its own dark instrument skin by default; a
+  System theme option is available in Preferences.
 
 ## Getting Started
 

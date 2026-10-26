@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// App-level configuration persisted via cosmic-config.
 #[derive(Debug, Default, Clone, CosmicConfigEntry, Eq, PartialEq)]
-#[version = 1]
+#[version = 2]
 pub struct Config {
     pub services_json: String,
     /// Polling interval in seconds (refresh mode). 0 means default.
@@ -22,8 +22,9 @@ pub struct Config {
     /// Retained for backwards compat; the swatch picker is gone in
     /// favour of the system accent. Only honoured in industrial mode.
     pub accent: String,
-    /// Theme mode: "system" (default, follows COSMIC) or "industrial"
-    /// (trimmed legacy dark plates + LEDs). Empty means system.
+    /// Theme mode: "" or "industrial" => skin (default); "system" =>
+    /// follow COSMIC. Only the exact string "system" (case-insensitive,
+    /// trimmed) opts out of the skin.
     pub theme_mode: String,
 }
 
@@ -47,11 +48,28 @@ impl Config {
         if a.is_empty() { "Emerald" } else { a }
     }
 
-    /// True when the industrial look is selected or by default.
-    /// True when the legacy industrial look is explicitly selected.
-    /// System is the default: an empty or "system" value follows COSMIC.
+    /// True when the industrial skin is active. Empty (unset) means the
+    /// skin: the applet ships skinned; "system" is the explicit opt-out.
+    /// Only the exact string "system" (case-insensitive, trimmed) opts out.
     pub fn use_industrial(&self) -> bool {
-        self.theme_mode.trim().eq_ignore_ascii_case("industrial")
+        !self.theme_mode.trim().eq_ignore_ascii_case("system")
+    }
+
+    #[allow(dead_code)]
+    /// Canonical persisted name for the active mode. The skin is written as
+    /// "industrial" so pre-v2 configs and the post-v2 default agree.
+    pub fn theme_mode_name(&self) -> &'static str {
+        if self.use_industrial() { "industrial" } else { "system" }
+    }
+
+    #[allow(dead_code)]
+    /// v1 -> v2 migration. The Listening Ports rail now starts collapsed, so a
+    /// v1 `show_ports = true` (which was the shipped default) is reset once.
+    /// Every other key carries over untouched.
+    pub fn migrate_from_v1(v1: &Self) -> Self {
+        let mut c = v1.clone();
+        c.show_ports = false;
+        c
     }
 }
 
@@ -138,5 +156,58 @@ mod tests {
                 "http".to_string()
             ))
         );
+    }
+
+    #[test]
+    fn use_industrial_is_skin_first() {
+        let mut c = Config::default();
+        // empty => skin
+        c.theme_mode = String::new();
+        assert!(c.use_industrial());
+        // legacy "industrial" => skin
+        c.theme_mode = "industrial".to_string();
+        assert!(c.use_industrial());
+        // garbage => skin (only exact "system" opts out)
+        c.theme_mode = "Dark".to_string();
+        assert!(c.use_industrial());
+        // whitespace trimmed
+        c.theme_mode = "  InDuStRiAl  ".to_string();
+        assert!(c.use_industrial());
+        // exact "system" => not skin
+        c.theme_mode = "system".to_string();
+        assert!(!c.use_industrial());
+        c.theme_mode = "  SYSTEM  ".to_string();
+        assert!(!c.use_industrial());
+    }
+
+    #[test]
+    fn theme_mode_name_canonicalises() {
+        let mut c = Config::default();
+        c.theme_mode = String::new();
+        assert_eq!(c.theme_mode_name(), "industrial");
+        c.theme_mode = "system".to_string();
+        assert_eq!(c.theme_mode_name(), "system");
+    }
+
+    #[test]
+    fn migrate_from_v1_resets_show_ports_only() {
+        let mut v1 = Config::default();
+        v1.show_ports = true;
+        v1.services_json = "svc".to_string();
+        v1.refresh_secs = 7;
+        v1.ignored_json = "ig".to_string();
+        v1.colloquial = true;
+        v1.hide_system = true;
+        v1.accent = "Amber".to_string();
+        v1.theme_mode = "system".to_string();
+        let v2 = Config::migrate_from_v1(&v1);
+        assert!(!v2.show_ports, "show_ports must reset to false");
+        assert_eq!(v2.services_json, "svc");
+        assert_eq!(v2.refresh_secs, 7);
+        assert_eq!(v2.ignored_json, "ig");
+        assert!(v2.colloquial);
+        assert!(v2.hide_system);
+        assert_eq!(v2.accent, "Amber");
+        assert_eq!(v2.theme_mode, "system");
     }
 }

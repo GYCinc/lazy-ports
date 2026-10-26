@@ -129,6 +129,14 @@ const COLOR_KEY: cosmic::iced::Color = cosmic::iced::Color {
     a: 1.0,
 }; // #d4d4d8 icons/badge text
 
+/// Ink for a resting action glyph. Deliberately brighter than COLOR_TEXT2:
+/// 14 px symbolic glyphs on the #1b1f25 card need #d4d4d8 to read as a
+/// control rather than a smudge. Alias of COLOR_KEY, named for its role.
+const COLOR_INK_ACTIVE: cosmic::iced::Color = COLOR_KEY;
+
+/// Width reserved for the action cluster (open . stop . expand . pin).
+const ACTIONS_WIDTH: f32 = 4.0 * 28.0 + 3.0 * 6.0 + 28.0;
+
 const COLOR_TEXT2: cosmic::iced::Color = cosmic::iced::Color {
     r: 0.667,
     g: 0.706,
@@ -233,6 +241,7 @@ fn link_title<'a>(title: String, url: String) -> Element<'a, Message> {
 }
 
 /// Plain row title: 13.0 px semibold text matching link_title typography.
+#[allow(dead_code)]
 fn plain_title<'a>(title: String, industrial: bool) -> Element<'a, Message> {
     let txt = widget::Text::new(title)
         .size(13.0)
@@ -243,6 +252,23 @@ fn plain_title<'a>(title: String, industrial: bool) -> Element<'a, Message> {
     } else {
         txt.into()
     }
+}
+
+/// Title text that ellipsises instead of overflowing into the action keys.
+/// `max_width` bounds the title column; the action cluster is reserved by
+/// the caller, so the two can never overlap.
+fn bounded_title<'a>(title: String, industrial: bool) -> Element<'a, Message> {
+    let mut txt = widget::Text::new(title)
+        .size(13.0)
+        .font(cosmic::font::semibold())
+        .wrapping(cosmic::iced::core::text::Wrapping::None)
+        .ellipsize(cosmic::iced::core::text::Ellipsize::End(
+            cosmic::iced::core::text::EllipsizeHeightLimit::Lines(1),
+        ));
+    if industrial {
+        txt = txt.class(cosmic::theme::Text::Color(COLOR_BRIGHT));
+    }
+    txt.into()
 }
 
 /// Secondary telemetry: 12 px monospace, readable mid-tone.
@@ -462,7 +488,7 @@ fn key_button_class(color: KeyColor, accent: Accent) -> cosmic::theme::Button {
         KeyColor::Green => accent.color,
         KeyColor::Danger => LED_RED,
         KeyColor::Blue => LED_CYAN,
-        KeyColor::Neutral => COLOR_TEXT2,
+        KeyColor::Neutral => COLOR_INK_ACTIVE,
     };
     let (hover_plate, hover_border, hover_ink) = match color {
         KeyColor::Danger => (COLOR_DANGER, LED_RED, LED_RED),
@@ -471,7 +497,7 @@ fn key_button_class(color: KeyColor, accent: Accent) -> cosmic::theme::Button {
         KeyColor::Neutral => (COLOR_BORDER, COLOR_BORDER_LIGHT, COLOR_BRIGHT),
     };
     cosmic::theme::Button::Custom {
-        active: Box::new(move |_, _| key_style_flat(base_ink)),
+        active: Box::new(move |_, _| key_style(COLOR_SURFACE, COLOR_BORDER, base_ink)),
         disabled: Box::new(|_| key_style_flat(COLOR_DIM)),
         hovered: Box::new(move |_, _| key_style(hover_plate, hover_border, hover_ink)),
         pressed: Box::new(move |_, _| key_style(COLOR_VIEWPORT, COLOR_BORDER_LIGHT, hover_ink)),
@@ -519,7 +545,7 @@ fn key_button<'a>(
         KeyColor::Green => accent.color,
         KeyColor::Danger => LED_RED,
         KeyColor::Blue => LED_CYAN,
-        KeyColor::Neutral => COLOR_TEXT2,
+        KeyColor::Neutral => COLOR_INK_ACTIVE,
     };
     let glyph = widget::container(icon::from_name(name).size(14))
         .width(Length::Fill)
@@ -843,7 +869,11 @@ fn card_shell<'a>(
                 .width(Length::Fill)
                 .clip(true),
         )
-        .push(actions_right);
+        .push(
+            widget::container(actions_right)
+                .width(Length::Fixed(ACTIONS_WIDTH))
+                .clip(false),
+        );
 
     let mut card_col = widget::column::with_capacity(3)
         .spacing(4.0)
@@ -1028,7 +1058,21 @@ impl cosmic::Application for AppModel {
         core: cosmic::Core,
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
-        let (config, config_ctx) = match cosmic::cosmic_config::Config::new(APP_ID, Config::VERSION)
+        // Detect a fresh v2 upgrade: if the v2 config directory did not exist
+        // before this run, the Listening Ports rail's stale v1 `show_ports=true`
+        // must be reset once (see Config::migrate_from_v1). On later launches
+        // the directory exists, so the user's own toggle choice is respected.
+        let config_root = std::env::var_os("XDG_CONFIG_HOME")
+            .map(std::path::PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))
+            .unwrap_or_default();
+        let v2_dir_existed = config_root
+            .join("cosmic")
+            .join(APP_ID)
+            .join(format!("v{}", Config::VERSION))
+            .exists();
+
+        let (mut config, config_ctx) = match cosmic::cosmic_config::Config::new(APP_ID, Config::VERSION)
         {
             Ok(ctx) => match Config::get_entry(&ctx) {
                 Ok(config) => (config, Some(ctx)),
@@ -1036,6 +1080,14 @@ impl cosmic::Application for AppModel {
             },
             Err(_) => (Config::default(), None),
         };
+
+        // One-shot v1 -> v2 migration: collapse the Listening Ports rail.
+        if !v2_dir_existed && config.show_ports {
+            config.show_ports = false;
+            if let Some(ctx) = &config_ctx {
+                let _ = ctx.set("show_ports", false);
+            }
+        }
         let (services, services_corrupt) = match parse_services(&config.services_json) {
             Ok(services) => (services, false),
             Err(_) => (Vec::new(), true),
@@ -1085,9 +1137,18 @@ impl cosmic::Application for AppModel {
         // Synchronize initial port reservations for any stopped services
         services::sync_reservations(&app.services);
 
+        // Install the skin's own dark theme on first launch so it is identical
+        // under a light system theme. System mode hands the theme back.
+        let skin_active = app.industrial();
+        let scan_task = Task::perform(ports::scan(), |v| action(Message::PortsRefreshed(v)));
+        let theme_task = if skin_active {
+            cosmic::command::set_theme(cosmic::theme::Theme::dark())
+        } else {
+            cosmic::command::set_theme(cosmic::theme::system_preference())
+        };
         (
             app,
-            Task::perform(ports::scan(), |v| action(Message::PortsRefreshed(v))),
+            Task::batch(vec![scan_task, theme_task]),
         )
     }
 
@@ -1206,7 +1267,7 @@ impl cosmic::Application for AppModel {
             pref_section = pref_section.add(
                 settings::item::builder("Refresh Rate")
                     .description("Background polling frequency for listening ports")
-                    .control(
+                    .flex_control(
                         widget::row::with_capacity(3)
                             .spacing(6)
                             .push(refresh_rate_key(
@@ -1232,14 +1293,14 @@ impl cosmic::Application for AppModel {
             pref_section = pref_section.add(
                 settings::item::builder(fl!("group-ports"))
                     .description("Combine multi-port sockets from the same process")
-                    .control(
+                    .flex_control(
                         widget::toggler(self.group_ports).on_toggle(|_| Message::ToggleGroup),
                     ),
             );
             pref_section = pref_section.add(
                 settings::item::builder(fl!("hide-system"))
                     .description("Filter out system daemons (systemd, cups, avahi, etc.)")
-                    .control(
+                    .flex_control(
                         widget::toggler(self.config.hide_system).on_toggle(|_| Message::ToggleHideSystem),
                     ),
             );
@@ -1268,12 +1329,12 @@ impl cosmic::Application for AppModel {
             pref_section = pref_section.add(
                 settings::item::builder("Theme")
                     .description("System follows COSMIC; Industrial keeps the legacy dark plates")
-                    .control(theme_control),
+                    .flex_control(theme_control),
             );
             pref_section = pref_section.add(
                 settings::item::builder("Colloquial Slang")
                     .description("Show playful status labels (PIMPIN', SLEEPIN', COOKED)")
-                    .control(
+                    .flex_control(
                         widget::toggler(self.config.colloquial).on_toggle(|_| Message::ToggleColloquial),
                     ),
             );
@@ -1283,7 +1344,7 @@ impl cosmic::Application for AppModel {
                 pref_section = pref_section.add(
                     settings::item::builder(format!("Ignored Processes ({})", ignored.len()))
                         .description(ignored.join(", "))
-                        .control(
+                        .flex_control(
                             widget::button::destructive(fl!("clear-ignored")).on_press(Message::ClearIgnored),
                         ),
                 );
@@ -1392,28 +1453,28 @@ impl cosmic::Application for AppModel {
 
             let mut form = settings::section();
             form = form.add(
-                settings::item::builder(fl!("name")).control(
+                settings::item::builder(fl!("name")).flex_control(
                     text_input(fl!("name-placeholder"), &self.in_name)
                         .on_input(Message::NameInput)
                         .width(Length::Fill),
                 ),
             );
             form = form.add(
-                settings::item::builder(fl!("address")).control(
+                settings::item::builder(fl!("address")).flex_control(
                     text_input(fl!("address-placeholder"), &self.in_address)
                         .on_input(Message::AddressInput)
                         .width(Length::Fill),
                 ),
             );
             form = form.add(
-                settings::item::builder(fl!("start-command")).control(
+                settings::item::builder(fl!("start-command")).flex_control(
                     text_input(fl!("start-command-placeholder"), &self.in_cmd)
                         .on_input(Message::CmdInput)
                         .width(Length::Fill),
                 ),
             );
             form = form.add(
-                settings::item::builder(fl!("working-directory")).control(
+                settings::item::builder(fl!("working-directory")).flex_control(
                     text_input(fl!("working-directory-placeholder"), &self.in_dir)
                         .on_input(Message::DirInput)
                         .width(Length::Fill),
@@ -1422,7 +1483,7 @@ impl cosmic::Application for AppModel {
             form = form.add(
                 settings::item::builder(fl!("reserve-port"))
                     .description("Hold this port with a silent tcp socket when offline")
-                    .control(widget::toggler(self.in_reserved).on_toggle(Message::ReservedInput)),
+                    .flex_control(widget::toggler(self.in_reserved).on_toggle(Message::ReservedInput)),
             );
 
             let mut form_buttons = widget::row::with_capacity(3)
@@ -2053,15 +2114,19 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::SetThemeMode(name) => {
-                let normalised = if name.trim().eq_ignore_ascii_case("industrial") {
-                    "industrial".to_string()
-                } else {
+                let normalised = if name.trim().eq_ignore_ascii_case("system") {
                     "system".to_string()
+                } else {
+                    "industrial".to_string()
                 };
                 self.config.theme_mode = normalised;
                 if let Some(ctx) = &self.config_ctx {
                     let _ = ctx.set("theme_mode", self.config.theme_mode.clone());
                 }
+                if self.industrial() {
+                    return cosmic::command::set_theme(cosmic::theme::Theme::dark());
+                }
+                return cosmic::command::set_theme(cosmic::theme::system_preference());
             }
             Message::FilterInput(v) => self.filter = v,
             Message::FilterTo(v) => self.filter = v,
@@ -2164,7 +2229,17 @@ impl cosmic::Application for AppModel {
     }
 
     fn style(&self) -> Option<cosmic::iced::theme::Style> {
-        Some(cosmic::applet::style())
+        if self.industrial() {
+            // The skin owns its surface: system text/icon colour must never
+            // leak into it (this is what cosmic::applet::style() would do).
+            Some(cosmic::iced::theme::Style {
+                background_color: cosmic::iced::Color::TRANSPARENT,
+                text_color: COLOR_BRIGHT,
+                icon_color: COLOR_KEY,
+            })
+        } else {
+            Some(cosmic::applet::style())
+        }
     }
 }
 
@@ -2747,7 +2822,7 @@ impl AppModel {
         let is_expanded = self.expanded_service.as_deref() == Some(&row_id);
         let port_url = format!("http://localhost:{}", p.port);
 
-        let title = plain_title(p.display_name.clone(), industrial);
+        let title = bounded_title(p.display_name.clone(), industrial);
 
         let badge_label = if let Some(fw) = &p.framework {
             fw.clone()
@@ -2902,7 +2977,7 @@ impl AppModel {
 
         // Title row owns only the (clipped) name + tag. Ports + PID move to
         // the full-width endpoint line below, so overlap is impossible.
-        let title = plain_title(display_name.clone(), industrial);
+        let title = bounded_title(display_name.clone(), industrial);
 
         let badge_label = if let Some(fw) = &framework {
             fw.clone()
@@ -3052,6 +3127,7 @@ impl AppModel {
     fn industrial(&self) -> bool {
         self.config.use_industrial()
     }
+
 
     /// The active accent scheme, resolved from persisted config.
     /// Only honoured in industrial mode; system mode uses the COSMIC accent.
