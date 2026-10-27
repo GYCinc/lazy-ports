@@ -1067,37 +1067,39 @@ impl cosmic::Application for AppModel {
             Err(_) => (Config::default(), None),
         };
 
-        // One-shot v1 -> v2 migration. cosmic-config does not carry keys over
-        // automatically, so when v2 is empty but v1 has data, copy every field
-        // across, reset the Listening Ports rail to collapsed, and (for the old
-        // "system" default) switch to the new skin default. Persisted to v2 so
-        // it only happens once; later launches respect the user's own choices.
-        let v1_has_data = cosmic::cosmic_config::Config::new(APP_ID, 1)
-            .ok()
-            .and_then(|c| Config::get_entry(&c).ok())
-            .map(|c| !c.services_json.trim().is_empty())
-            .unwrap_or(false);
+        // cosmic-config's get_local falls back to the previous (v1) version
+        // automatically, so reads already see v1 data (services, theme_mode, ...).
+        // Only the Listening Ports rail needs an explicit reset to the new
+        // collapsed-by-default state: write false to v2 once if no v2 file yet.
+        let v2_show_ports_exists = std::env::var_os("XDG_CONFIG_HOME")
+            .map(std::path::PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))
+            .unwrap_or_default()
+            .join("cosmic").join(APP_ID).join("v2").join("show_ports")
+            .exists();
+        // Reset Listening Ports rail to collapsed-by-default once.
+        let v2_show_ports_path = std::env::var_os("XDG_CONFIG_HOME")
+            .map(std::path::PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))
+            .unwrap_or_default()
+            .join("cosmic").join(APP_ID).join("v2").join("show_ports");
+        if !v2_show_ports_path.exists() {
+            if let Some(ctx) = &config_ctx {
+                let _ = ctx.set("show_ports", false);
+            }
+            config.show_ports = false;
+        }
 
-        if v1_has_data && config.services_json.trim().is_empty() {
-            if let Ok(v1ctx) = cosmic::cosmic_config::Config::new(APP_ID, 1) {
-                if let Ok(v1cfg) = Config::get_entry(&v1ctx) {
-                    let mut migrated = v1cfg;
-                    migrated.show_ports = false;
-                    if migrated.theme_mode.trim().eq_ignore_ascii_case("system") {
-                        migrated.theme_mode.clear();
-                    }
-                    if let Some(ctx) = &config_ctx {
-                        let _ = ctx.set("services_json", migrated.services_json.clone());
-                        let _ = ctx.set("refresh_secs", migrated.refresh_secs);
-                        let _ = ctx.set("ignored_json", migrated.ignored_json.clone());
-                        let _ = ctx.set("colloquial", migrated.colloquial);
-                        let _ = ctx.set("hide_system", migrated.hide_system);
-                        let _ = ctx.set("show_ports", migrated.show_ports);
-                        let _ = ctx.set("accent", migrated.accent.clone());
-                        let _ = ctx.set("theme_mode", migrated.theme_mode.clone());
-                    }
-                    config = migrated;
-                }
+        // Flip old "system" default to the new skin default once.
+        let v2_theme_path = std::env::var_os("XDG_CONFIG_HOME")
+            .map(std::path::PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))
+            .unwrap_or_default()
+            .join("cosmic").join(APP_ID).join("v2").join("theme_mode");
+        if !v2_theme_path.exists() && config.theme_mode.trim().eq_ignore_ascii_case("system") {
+            config.theme_mode.clear();
+            if let Some(ctx) = &config_ctx {
+                let _ = ctx.set("theme_mode", String::new());
             }
         }
         let (services, services_corrupt) = match parse_services(&config.services_json) {
